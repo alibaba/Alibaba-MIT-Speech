@@ -1,0 +1,2690 @@
+From beb50ec01b054bd3b5ea054c74bd6a918dc386a8 Mon Sep 17 00:00:00 2001
+From: "sly.zsl" <sly.zsl@alibaba-inc.com>
+Date: Mon, 4 Jun 2018 19:52:11 +0800
+Subject: [PATCH] add DFSMN related codes and example scripts
+
+---
+ egs/librispeech/s5/local/nnet/DFSMN_L.proto       |  23 ++
+ egs/librispeech/s5/local/nnet/DFSMN_M.proto       |  19 ++
+ egs/librispeech/s5/local/nnet/DFSMN_S.proto       |  19 ++
+ egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh | 144 +++++++++
+ src/cudamatrix/cu-device.cc                       |  17 ++
+ src/cudamatrix/cu-device.h                        |   2 +
+ src/cudamatrix/cu-kernels-ansi.h                  |  32 ++
+ src/cudamatrix/cu-kernels.cu                      | 335 +++++++++++++++++++++
+ src/cudamatrix/cu-kernels.h                       |  75 +++++
+ src/cudamatrix/cu-matrix.cc                       | 209 ++++++++++++-
+ src/cudamatrix/cu-matrix.h                        |  33 +-
+ src/featbin/Makefile                              |   2 +-
+ src/featbin/append-ivector-to-feats.cc            | 231 ++++++++++++++
+ src/nnet/nnet-affine-transform.h                  |  28 +-
+ src/nnet/nnet-component.cc                        |  22 ++
+ src/nnet/nnet-component.h                         |   9 +-
+ src/nnet/nnet-deep-fsmn.h                         | 350 ++++++++++++++++++++++
+ src/nnet/nnet-fsmn.h                              | 211 +++++++++++++
+ src/nnet/nnet-linear-transform.h                  |  20 +-
+ src/nnet/nnet-nnet.cc                             |  25 ++
+ src/nnet/nnet-nnet.h                              |   4 +
+ src/nnet/nnet-uni-deep-fsmn.h                     | 319 ++++++++++++++++++++
+ src/nnet/nnet-uni-fsmn.h                          | 175 +++++++++++
+ 23 files changed, 2282 insertions(+), 22 deletions(-)
+ create mode 100644 egs/librispeech/s5/local/nnet/DFSMN_L.proto
+ create mode 100644 egs/librispeech/s5/local/nnet/DFSMN_M.proto
+ create mode 100644 egs/librispeech/s5/local/nnet/DFSMN_S.proto
+ create mode 100644 egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh
+ create mode 100644 src/featbin/append-ivector-to-feats.cc
+ create mode 100644 src/nnet/nnet-deep-fsmn.h
+ create mode 100644 src/nnet/nnet-fsmn.h
+ create mode 100644 src/nnet/nnet-uni-deep-fsmn.h
+ create mode 100644 src/nnet/nnet-uni-fsmn.h
+
+diff --git a/egs/librispeech/s5/local/nnet/DFSMN_L.proto b/egs/librispeech/s5/local/nnet/DFSMN_L.proto
+new file mode 100644
+index 0000000..738b486
+--- /dev/null
++++ b/egs/librispeech/s5/local/nnet/DFSMN_L.proto
+@@ -0,0 +1,23 @@
++<NnetProto>
++<AffineTransform> <InputDim> 1020  <OutputDim> 2048 <Xavier> 1
++<ParametricRelu> <InputDim> 2048 <OutputDim> 2048
++<LinearTransform> <InputDim> 2048 <OutputDim> 512 <Xavier> 1
++<Fsmn> <InputDim> 512 <OutputDim> 512  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<AffineTransform> <InputDim> 512 <OutputDim> 2048 <Xavier> 1
++<ParametricRelu> <InputDim> 2048 <OutputDim> 2048
++<AffineTransform> <InputDim> 2048 <OutputDim> 2048 <Xavier> 1
++<ParametricRelu> <InputDim> 2048 <OutputDim> 2048
++<LinearTransform> <InputDim> 2048 <OutputDim> 512 <Xavier> 1
++<AffineTransform> <InputDim> 512 <OutputDim> 5777 <Xavier> 1
++<Softmax> <InputDim> 5777 <OutputDim> 5777
++</NnetProto>
++
+diff --git a/egs/librispeech/s5/local/nnet/DFSMN_M.proto b/egs/librispeech/s5/local/nnet/DFSMN_M.proto
+new file mode 100644
+index 0000000..ea3ed45
+--- /dev/null
++++ b/egs/librispeech/s5/local/nnet/DFSMN_M.proto
+@@ -0,0 +1,19 @@
++<NnetProto>
++<AffineTransform> <InputDim> 1020  <OutputDim> 2048 <MaxNorm> 0.000000 <Xavier> 1
++<ParametricRelu> <InputDim> 2048 <OutputDim> 2048
++<LinearTransform> <InputDim> 2048 <OutputDim> 512 <ParamStddev> 0.010000 <Xavier> 1
++<Fsmn> <InputDim> 512 <OutputDim> 512  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 512 <OutputDim> 512 <HidSize> 2048  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<AffineTransform> <InputDim> 512 <OutputDim> 2048 <Xavier> 1
++<ParametricRelu> <InputDim> 2048 <OutputDim> 2048
++<AffineTransform> <InputDim> 2048 <OutputDim> 2048 <Xavier> 1
++<ParametricRelu> <InputDim> 2048 <OutputDim> 2048
++<LinearTransform> <InputDim> 2048 <OutputDim> 512 <Xavier> 1
++<AffineTransform> <InputDim> 512 <OutputDim> 5777 <Xavier> 1
++<Softmax> <InputDim> 5777 <OutputDim> 5777
++</NnetProto>
++
+diff --git a/egs/librispeech/s5/local/nnet/DFSMN_S.proto b/egs/librispeech/s5/local/nnet/DFSMN_S.proto
+new file mode 100644
+index 0000000..cd2d026
+--- /dev/null
++++ b/egs/librispeech/s5/local/nnet/DFSMN_S.proto
+@@ -0,0 +1,19 @@
++<NnetProto>
++<AffineTransform> <InputDim> 1020  <OutputDim> 1024 <MaxNorm> 0.000000 <Xavier> 1
++<ParametricRelu> <InputDim> 1024 <OutputDim> 1024
++<LinearTransform> <InputDim> 1024 <OutputDim> 384 <ParamStddev> 0.010000 <Xavier> 1
++<Fsmn> <InputDim> 384 <OutputDim> 384  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 384 <OutputDim> 384 <HidSize> 1024  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 384 <OutputDim> 384 <HidSize> 1024  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 384 <OutputDim> 384 <HidSize> 1024  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 384 <OutputDim> 384 <HidSize> 1024  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<DeepFsmn> <InputDim> 384 <OutputDim> 384 <HidSize> 1024  <LOrder> 20 <ROrder> 20 <LStride> 2 <RStride> 2
++<AffineTransform> <InputDim> 384 <OutputDim> 1024 <Xavier> 1
++<ParametricRelu> <InputDim> 1024 <OutputDim> 1024
++<AffineTransform> <InputDim> 1024 <OutputDim> 1024 <Xavier> 1
++<ParametricRelu> <InputDim> 1024 <OutputDim> 1024
++<LinearTransform> <InputDim> 1024 <OutputDim> 384 <Xavier> 1
++<AffineTransform> <InputDim> 384 <OutputDim> 5777 <Xavier> 1
++<Softmax> <InputDim> 5777 <OutputDim> 5777
++</NnetProto>
++
+diff --git a/egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh b/egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh
+new file mode 100644
+index 0000000..25416d9
+--- /dev/null
++++ b/egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh
+@@ -0,0 +1,144 @@
++. ./path.sh
++. ./cmd.sh
++
++. utils/parse_options.sh || exit 1;
++
++set -e
++set -u
++set -o pipefail
++#########################
++
++dnn_model=$1
++
++stage=1
++
++##Make fbank features
++if [ $stage -le 1 ]; then
++  mkdir -p data_fbank
++
++  for x in train_960_cleaned test_other test_clean dev_other dev_clean; do
++  fbankdir=fbank/$x
++  
++  cp -r data/$x data_fbank/$x
++  steps/make_fbank.sh --nj 30 --cmd "$train_cmd"  --fbank-config conf/fbank.cfg \
++    data_fbank/$x exp/make_fbank/$x $fbankdir
++  steps/compute_cmvn_stats.sh data_fbank/$x exp/make_fbank/$x $fbankdir
++done
++fi
++###############
++if [ $stage -le 2 ]; then
++
++  steps/align_fmllr.sh --nj 30 --cmd "$train_cmd" \
++    data/train_960_cleaned data/lang exp/tri6b_cleaned exp/tri6b_cleaned_ali_train_960_cleaned
++  steps/align_fmllr.sh --nj 10 --cmd "$train_cmd" \
++    data/dev_clean data/lang exp/tri6b_cleaned exp/tri6b_cleaned_ali_dev_clean
++  steps/align_fmllr.sh --nj 10 --cmd "$train_cmd" \
++    data/dev_other data/lang exp/tri6b_cleaned exp/tri6b_cleaned_ali_dev_other
++fi
++#####CE-training
++lrate=0.00001
++dir=exp/tri7b_${dnn_model}
++data_fbk=data_fbank
++if [ $stage -le 3 ]; then
++	proto=local/nnet/${dnn_model}.proto
++
++        cat exp/nnet3_cleaned/ivectors_train_960_cleaned_hires/ivector_online.scp exp/nnet3_cleaned/ivectors_dev_clean_hires/ivector_online.scp \
++            exp/nnet3_cleaned/ivectors_dev_other_hires/ivector_online.scp > exp/nnet3_cleaned/ivectors_train_960_dev_hires/ivector_online.scp
++
++	$cuda_cmd $dir/_train_nnet.log \
++   	steps/nnet/train_faster.sh --learn-rate $lrate --nnet-proto $proto \
++        --start_half_lr 5 --momentum 0.9 \
++	--train-tool "nnet-train-fsmn-streams" \
++       	--feat-type plain --splice 1 \
++	--cmvn-opts "--norm-means=true --norm-vars=false" --delta_opts "--delta-order=2" \
++        --train-tool-opts "--minibatch-size=4096" \
++        --ivector scp:exp/nnet3_cleaned/ivectors_train_960_dev_hires/ivector_online.scp \
++	--ivector-append-tool "append-ivector-to-feats --online-ivector-period=10" \
++       	$data_fbk/train_960_cleaned $data_fbk/dev_clean data/lang exp/tri6b_cleaned_ali_train_960_cleaned exp/tri6b_cleaned_ali_dev_clean $dir
++fi
++####Decode
++acwt=0.08
++if [ $stage -le 4 ]; then
++	gmm=exp/tri6b_cleaned
++	dataset="test_clean dev_clean test_other dev_other"
++  	for set in $dataset
++  	do
++  	  	steps/nnet/decode.sh --nj 16 --cmd "$decode_cmd" \
++		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
++      		--config conf/decode.config --acwt $acwt \
++		$gmm/graph_tgsmall \
++        	$data_fbk/$set $dir/decode_tgsmall_${set}
++
++        	steps/lmrescore.sh --cmd "$decode_cmd" data/lang_test_{tgsmall,tgmed} \
++        	$data_fbk/$set $dir/decode_{tgsmall,tgmed}_${set}
++        	
++		steps/lmrescore_const_arpa.sh \
++		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
++        	--cmd "$decode_cmd" data/lang_test_{tgsmall,tglarge} \
++       		$data_fbk/$set $dir/decode_{tgsmall,tglarge}_${set}
++        	
++		steps/lmrescore_const_arpa.sh \
++		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
++        	--cmd "$decode_cmd" data/lang_test_{tgsmall,fglarge} \
++        	$data_fbk/$set $dir/decode_{tgsmall,fglarge}_${set}
++  	done
++
++	for set in $dataset; 
++	do 
++	for lm in fglarge tglarge tgmed tgsmall; 
++	do 
++		grep WER $dir/decode_${lm}_${set}*/wer* | ./utils/best_wer.sh 
++	done
++	done
++fi
++
++nj=32
++if [ $stage -le 5 ]; then
++        steps/nnet/align.sh --nj $nj --cmd "$train_cmd" $data_fbk/train_960_cleaned data/lang $dir ${dir}_ali
++        steps/nnet/make_denlats.sh --nj $nj --cmd "$decode_cmd" --config conf/decode_dnn.config --acwt $acwt \
++        $data_fbk/train_960_cleaned data/lang $dir ${dir}_denlats
++fi
++
++####do smbr
++if [ $stage -le 5 ]; then
++        steps/nnet/train_mpe.sh --cmd "$cuda_cmd" --num-iters 2 --learn-rate 0.0000002 --acwt $acwt --do-smbr true \
++        $data_fbk/train_960_cleaned data/lang $dir ${dir}_ali ${dir}_denlats ${dir}_smbr
++fi
++
++###decode
++dir=${dir}_smbr
++acwt=0.03
++if [ $stage -le 6 ]; then
++        gmm=exp/tri6b_cleaned
++        dataset="test_clean dev_clean test_other dev_other"
++        for set in $dataset
++        do
++                steps/nnet/decode.sh --nj 16 --cmd "$decode_cmd" \
++		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
++                --config conf/decode_dnn.config --acwt $acwt \
++                $gmm/graph_tgsmall \
++                $data_fbk/$set $dir/decode_tgsmall_${set}
++
++                steps/lmrescore.sh --cmd "$decode_cmd" data/lang_test_{tgsmall,tgmed} \
++                $data_fbk/$set $dir/decode_{tgsmall,tgmed}_${set}
++
++                steps/lmrescore_const_arpa.sh \
++		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
++                --cmd "$decode_cmd" data/lang_test_{tgsmall,tglarge} \
++                $data_fbk/$set $dir/decode_{tgsmall,tglarge}_${set}
++
++                steps/lmrescore_const_arpa.sh \
++		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
++                --cmd "$decode_cmd" data/lang_test_{tgsmall,fglarge} \
++                $data_fbk/$set $dir/decode_{tgsmall,fglarge}_${set}
++        done
++	for set in $dataset;
++        do
++        for lm in fglarge tglarge tgmed tgsmall;
++        do
++                grep WER $dir/decode_${lm}_${set}*/wer* | ./utils/best_wer.sh
++        done
++        done
++
++fi
++
+diff --git a/src/cudamatrix/cu-device.cc b/src/cudamatrix/cu-device.cc
+index c5114ed..1ac9d68 100644
+--- a/src/cudamatrix/cu-device.cc
++++ b/src/cudamatrix/cu-device.cc
+@@ -219,6 +219,23 @@ void CuDevice::SelectGpuId(std::string use_gpu) {
+   }
+ }
+ 
++void CuDevice::SetGpuId(int n) {
++  cudaError_t e = cudaSetDevice(n);
++  if (e == cudaSuccess) {
++      char name[128];
++      DeviceGetName(name,128,n);
++      int64 free, total;
++      std::string mem_stats;
++      mem_stats = GetFreeMemory(&free, &total);
++      KALDI_LOG << "cudaSetDevice(" << n << "): "
++                        << name << "\t" << mem_stats;
++      FinalizeActiveGpu();
++  }
++  else{
++      KALDI_WARN << "Cannot select this device: return code " << e
++                  << ", Error message: \"" << cudaGetErrorString(e) << "\"";
++  }
++}
+ 
+ void CuDevice::FinalizeActiveGpu() {
+   // The device at this point should have active GPU, so we can query its name
+diff --git a/src/cudamatrix/cu-device.h b/src/cudamatrix/cu-device.h
+index 9910535..c99b36b 100644
+--- a/src/cudamatrix/cu-device.h
++++ b/src/cudamatrix/cu-device.h
+@@ -98,6 +98,8 @@ class CuDevice {
+     return active_gpu_id_;
+   }
+ 
++  void SetGpuId(int n);
++
+   /// Returns true if either we have no GPU, or we have a GPU
+   /// and it supports double precision.
+   bool DoublePrecisionSupported();
+diff --git a/src/cudamatrix/cu-kernels-ansi.h b/src/cudamatrix/cu-kernels-ansi.h
+index 6b99a77..61c3d5f 100644
+--- a/src/cudamatrix/cu-kernels-ansi.h
++++ b/src/cudamatrix/cu-kernels-ansi.h
+@@ -6,6 +6,7 @@
+ //                2013  Xiaohui Zhang
+ //           2013-2015  Guoguo Chen
+ //           2016-2017  Shiyin Kang
++//                2018 Alibaba.Inc (Author: ShiLiang Zhang)
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -790,7 +791,38 @@ void cuda_uncompress_uint8(dim3 Gr, dim3 Bl, BaseFloat *dest,
+                           int src_stride, float scale);
+ 
+ 
++//////////////////////////////////////////////////////
++////           FSMN kernel functions          ///////
++////////////////////////////////////////////////////
++void cudaF_gen_memory(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, const float* r_filter, 
++                      float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride);
++void cudaD_gen_memory(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, const double* r_filter,  
++                      float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride);
+ 
++void cudaF_memory_err_back(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, const float* r_filter, 
++                           float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride);
++void cudaD_memory_err_back(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, const double* r_filter,  
++                           float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride);
++
++void cudaF_gen_uni_memory(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, float* flags, 
++                          MatrixDim d, int l_order, int l_stride);
++void cudaD_gen_uni_memory(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, float* flags, 
++                          MatrixDim d, int l_order, int l_stride);
++
++void cudaF_uni_memory_err_back(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, float* flags, 
++                               MatrixDim d, int l_order, int l_stride);
++void cudaD_uni_memory_err_back(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, float* flags, 
++                               MatrixDim d, int l_order, int l_stride);
++
++void cudaF_get_l_filter_err(dim3 Gr, dim3 Bl, float *mat_out, const float* diff, const float* mat_in, float* flags, MatrixDim d, 
++                            int l_order, int l_stride, float lr);
++void cudaD_get_l_filter_err(dim3 Gr, dim3 Bl, double *mat_out, const double* diff, const double* mat_in, float* flags, MatrixDim d, 
++                            int l_order, int l_stride, float lr);
++
++void cudaF_get_r_filter_err(dim3 Gr, dim3 Bl, float *mat_out, const float* diff, const float* mat_in, float* flags, MatrixDim d, 
++                            int r_order, int r_stride, float lr);
++void cudaD_get_r_filter_err(dim3 Gr, dim3 Bl, double *mat_out, const double* diff, const double* mat_in, float* flags, MatrixDim d, 
++                            int r_order, int r_stride, float lr);
+ } // extern "C"
+ 
+ #endif // HAVE_CUDA
+diff --git a/src/cudamatrix/cu-kernels.cu b/src/cudamatrix/cu-kernels.cu
+index 934a860..5591622 100644
+--- a/src/cudamatrix/cu-kernels.cu
++++ b/src/cudamatrix/cu-kernels.cu
+@@ -8,6 +8,8 @@
+ //           2013-2015  Guoguo Chen
+ //           2016-2017  Shiyin Kang
+ //                2017  Hossein Hadian, Daniel Galvez
++//                2018 Alibaba.Inc (Author: ShiLiang Zhang)
++
+ 
+ // Licensed under the Apache License, Version 2.0 (the "License");
+ // you may not use this file except in compliance with the License.
+@@ -5445,3 +5447,336 @@ void cuda_uncompress_int16(dim3 Gr, dim3 Bl, BaseFloat *dest,
+                            int src_stride, float scale) {
+   _cuda_uncompress<<<Gr, Bl>>>(dest, dim, src, src_stride, scale);
+ }
++
++//////////////////////////////////////////////////////
++////           FSMN kernel functions          ///////
++////////////////////////////////////////////////////
++
++template<typename Real>
++__global__
++static void _gen_memory(Real* out, const Real* in, const Real *l_filter, const Real *r_filter, float *flags, MatrixDim d, 
++                        int l_order, int r_order, int l_stride, int r_stride)
++{
++  int32_cuda i = blockIdx.x * blockDim.x + threadIdx.x;
++  if(i < d.cols*d.rows)
++  {
++    int row = i/d.cols;
++    int col = i%d.cols;
++    Real value = 0.0;
++    int shift_index = 0;
++    int index = row*d.stride + col;
++    out[index] = in[index];
++    for (int order = 0; order < l_order; order++)
++    {
++      shift_index = row - order*l_stride;
++      if (shift_index >= 0 && flags[shift_index] == flags[row])
++      {
++        value += in[shift_index*d.stride + col] * l_filter[order*d.stride + col];
++      }
++    }
++    for (int order = 1; order <= r_order; order++)
++    {
++      shift_index = row + order*r_stride;
++      if (shift_index < d.rows && flags[shift_index] == flags[row])
++      {
++        value += in[shift_index*d.stride + col] * r_filter[(order - 1)*d.stride + col];
++      }
++    }
++    out[index] += value;
++  }
++}
++
++template<typename Real>
++__global__
++static void _memory_err_back(Real* out, const Real* in, const Real *l_filter, const Real *r_filter, float *flags, MatrixDim d, 
++                             int l_order, int r_order, int l_stride, int r_stride)
++{
++  int32_cuda i = blockIdx.x * blockDim.x + threadIdx.x;
++  if (i < d.cols*d.rows)
++  {
++    int row = i/d.cols;
++    int col = i%d.cols;
++    Real value = 0.0;
++    int shift_index = 0;
++    int index = row*d.stride + col;
++    out[index] = in[index];
++    for (int order = -r_order; order < 0; order++)
++    {
++      shift_index = row + order*r_stride;
++      if (shift_index >= 0 && flags[shift_index] == flags[row])
++      {
++        value += in[shift_index*d.stride + col] * r_filter[(-order - 1)*d.stride + col];
++      }
++    }
++    for (int order = 0; order < l_order; order++)
++    {
++      shift_index = row + order*l_stride;
++      if (shift_index < d.rows && flags[shift_index] == flags[row])
++      {
++        value += in[shift_index*d.stride + col] * l_filter[order*d.stride + col];
++      }
++    }
++    out[index] += value;
++  }
++}
++
++template<typename Real>
++__global__
++static void _gen_uni_memory(Real* out, const Real* in, const Real *l_filter, float *flags, MatrixDim d, int l_order, int l_stride)
++{
++  int32_cuda i = blockIdx.x * blockDim.x + threadIdx.x;
++  if (i < d.cols*d.rows)
++  {
++    int row = i / d.cols;
++    int col = i%d.cols;
++    Real value = 0.0;
++    int shift_index = 0;
++    int index = row*d.stride + col;
++    out[index] = in[index];
++    for (int order = 0; order < l_order; order++)
++    {
++      shift_index = row - order*l_stride;
++      if (shift_index >= 0 && flags[shift_index] == flags[row])
++      {
++        value += in[shift_index*d.stride + col] * l_filter[order*d.stride + col];
++      }
++    }
++    out[index] += value;
++  }
++}
++
++template<typename Real>
++__global__
++static void _uni_memory_err_back(Real* out, const Real* in, const Real *l_filter, float *flags, MatrixDim d, int l_order, int l_stride)
++{
++  int32_cuda i = blockIdx.x * blockDim.x + threadIdx.x;
++  if (i < d.cols*d.rows)
++  {
++    int row = i / d.cols;
++    int col = i%d.cols;
++    Real value = 0.0;
++    int shift_index = 0;
++    int index = row*d.stride + col;
++    out[index] = in[index];
++    for (int order = 0; order < l_order; order++)
++    {
++      shift_index = row + order*l_stride;
++      if (shift_index < d.rows && flags[shift_index] == flags[row])
++      {
++        value += in[shift_index*d.stride + col] * l_filter[order*d.stride + col];
++      }
++    }
++    out[index] += value;
++  }
++}
++
++template<typename Real>
++__global__
++static void _get_l_filter_err(Real* out, const Real* diff, const Real* in, float *flags, MatrixDim d, int l_order, int l_stride, float lr)
++{
++  int j = blockIdx.x;
++  int THREADS = blockDim.x;
++  if (j >= d.cols*l_order) return;
++
++  __shared__ Real aux[CU1DBLOCK];
++
++  int steps = (d.rows - 1)/THREADS + 1;
++  int order = j/d.cols;
++  int col   = j%d.cols;
++  int shift = order * l_stride; 
++  int index = order*d.stride + col;
++  //copy input to aux
++  int row = threadIdx.x - shift;
++
++  if (steps > 1)
++  {
++    if (row >= 0 && abs(flags[threadIdx.x] - flags[row])<1e-2)
++    {
++      aux[threadIdx.x] = in[col + row*d.stride] * diff[col + threadIdx.x*d.stride];
++    }
++    else
++    {
++      aux[threadIdx.x] = 0;
++    }
++    __syncthreads();
++    for (int i = 1; i<steps; ++i)
++    {
++      int index = threadIdx.x + i*THREADS;
++
++      if (index < d.rows && abs(flags[index] - flags[index - shift])<1e-2)
++        aux[threadIdx.x] += in[(index - shift)*d.stride + col] * diff[index*d.stride + col];
++    }
++    __syncthreads();
++  }
++  else
++  {
++    if (row >= 0 && threadIdx.x<d.rows && abs(flags[threadIdx.x] - flags[row])<1e-2)
++    {
++      aux[threadIdx.x] = in[col + row*d.stride] * diff[col + threadIdx.x*d.stride];
++    }
++    else
++    {
++      aux[threadIdx.x] = 0;
++    }
++    __syncthreads();
++  }
++
++    int nTotalThreads = THREADS;
++  __syncthreads();
++  while (nTotalThreads > 1) {
++    int halfPoint = ((1 + nTotalThreads) >> 1);   // divide by two
++    // only the first half of the threads will be active.
++    if (threadIdx.x < halfPoint)  {
++      // Get the shared value stored by another thread
++      if (threadIdx.x + halfPoint < nTotalThreads)
++        aux[threadIdx.x] += aux[threadIdx.x + halfPoint];
++    }
++    __syncthreads();
++    nTotalThreads = ((1 + nTotalThreads) >> 1);   // divide by two.
++  }
++    Real sum = aux[0];
++  __syncthreads();
++    out[index] = out[index]-lr*sum;
++}
++
++template<typename Real>
++__global__
++static void _get_r_filter_err(Real* out, const Real* diff, const Real* in, float *flags, MatrixDim d, int r_order, int r_stride, float lr)
++{
++  int j = blockIdx.x;
++  int THREADS = blockDim.x;
++  if (j >= d.cols*r_order) return;
++
++  __shared__ Real aux[CU1DBLOCK];
++
++  int steps = (d.rows - 1) / THREADS + 1;
++  int order = j/d.cols;
++  int col = j%d.cols;
++  int shift = (order + 1) * r_stride;
++  int index = order*d.stride + col;
++  //copy input to aux
++  int row = threadIdx.x + shift;
++  if (steps > 1)
++  {
++    if (row <d.rows && abs(flags[threadIdx.x] - flags[row])<1e-2)
++    {
++      aux[threadIdx.x] = in[row*d.stride + col] * diff[threadIdx.x *d.stride + col];
++    }
++    else
++    {
++      aux[threadIdx.x] = 0;
++    }
++    __syncthreads();
++    for (int i = 1; i<steps; ++i)
++    {
++      int index = threadIdx.x + i*THREADS;
++      if (index + shift < d.rows && abs(flags[index] - flags[index + shift])<1e-2)
++        aux[threadIdx.x] += in[(index + shift)*d.stride + col] * diff[index*d.stride + col];
++    }
++    __syncthreads();
++  }
++  else
++  {
++    if (row <d.rows &&threadIdx.x<d.rows&& abs(flags[threadIdx.x] - flags[row])<1e-2)
++    {
++      aux[threadIdx.x] = in[row*d.stride + col] * diff[threadIdx.x *d.stride + col];
++    }
++    else
++    {
++      aux[threadIdx.x] = 0;
++    }
++    __syncthreads();
++  }
++    int nTotalThreads = THREADS;
++  __syncthreads();
++  while (nTotalThreads > 1) {
++    int halfPoint = ((1 + nTotalThreads) >> 1);   // divide by two
++    // only the first half of the threads will be active.
++    if (threadIdx.x < halfPoint)  {
++      // Get the shared value stored by another thread
++      if (threadIdx.x + halfPoint < nTotalThreads)
++        aux[threadIdx.x] += aux[threadIdx.x + halfPoint];
++    }
++    __syncthreads();
++    nTotalThreads = ((1 + nTotalThreads) >> 1);   // divide by two.
++  }
++  
++    Real sum = aux[0];
++     __syncthreads();
++  out[index] = out[index]-lr*sum;
++}
++
++
++
++void cudaF_gen_memory(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, const float* r_filter, 
++                      float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  _gen_memory<<<Gr, Bl >>>(mat_out, mat_in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++void cudaD_gen_memory(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, const double* r_filter, 
++                      float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  _gen_memory <<<Gr, Bl >> >(mat_out, mat_in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++void cudaF_memory_err_back(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, const float* r_filter, 
++                           float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  _memory_err_back<<<Gr, Bl >>>(mat_out, mat_in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++void cudaD_memory_err_back(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, const double* r_filter, 
++                           float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  _memory_err_back<<<Gr, Bl >>>(mat_out, mat_in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++void cudaF_gen_uni_memory(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, float* flags, MatrixDim d, 
++                          int l_order, int l_stride)
++{
++  _gen_uni_memory << <Gr, Bl >> >(mat_out, mat_in, l_filter, flags, d, l_order, l_stride);
++}
++
++void cudaD_gen_uni_memory(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, float* flags, MatrixDim d, 
++                          int l_order, int l_stride)
++{
++  _gen_uni_memory << <Gr, Bl >> >(mat_out, mat_in, l_filter, flags, d, l_order, l_stride);
++}
++
++void cudaF_uni_memory_err_back(dim3 Gr, dim3 Bl, float *mat_out, const float* mat_in, const float *l_filter, float* flags, MatrixDim d, 
++                               int l_order, int l_stride)
++{
++  _uni_memory_err_back << <Gr, Bl >> >(mat_out, mat_in, l_filter, flags, d, l_order, l_stride);
++}
++
++void cudaD_uni_memory_err_back(dim3 Gr, dim3 Bl, double *mat_out, const double* mat_in, const double *l_filter, float* flags, MatrixDim d, 
++                               int l_order, int l_stride)
++{
++  _uni_memory_err_back << <Gr, Bl >> >(mat_out, mat_in, l_filter, flags, d, l_order, l_stride);
++}
++
++void cudaF_get_l_filter_err(dim3 Gr, dim3 Bl, float *mat_out, const float *diff, const float* mat_in, float* flags, MatrixDim d, 
++                            int l_order, int l_stride, float lr)
++{
++  _get_l_filter_err <<<Gr, Bl >>>(mat_out, diff, mat_in, flags, d, l_order, l_stride, lr);
++}
++
++void cudaD_get_l_filter_err(dim3 Gr, dim3 Bl, double *mat_out, const double *diff, const double* mat_in, float* flags, MatrixDim d, 
++                            int l_order, int l_stride, float lr)
++{
++  _get_l_filter_err <<<Gr, Bl >>>(mat_out, diff, mat_in, flags, d, l_order, l_stride, lr);
++}
++
++void cudaF_get_r_filter_err(dim3 Gr, dim3 Bl, float *mat_out, const float *diff, const float* mat_in, float* flags, MatrixDim d, 
++                            int r_order, int r_stride, float lr)
++{
++  _get_r_filter_err <<<Gr, Bl >>>(mat_out, diff, mat_in, flags, d, r_order, r_stride, lr);
++}
++
++void cudaD_get_r_filter_err(dim3 Gr, dim3 Bl, double *mat_out, const double *diff, const double* mat_in, float* flags, MatrixDim d, 
++                            int r_order, int r_stride, float lr)
++{
++  _get_r_filter_err <<<Gr, Bl >>>(mat_out, diff, mat_in, flags, d, r_order, r_stride, lr);
++}
++
+diff --git a/src/cudamatrix/cu-kernels.h b/src/cudamatrix/cu-kernels.h
+index 8f719a8..e49d0ee 100644
+--- a/src/cudamatrix/cu-kernels.h
++++ b/src/cudamatrix/cu-kernels.h
+@@ -7,6 +7,7 @@
+ //                2013  Xiaohui Zhang
+ //           2013-2015  Guoguo Chen
+ //           2016-2017  Shiyin Kang
++//                2018 Alibaba.Inc (Author: ShiLiang Zhang)
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -1547,6 +1548,80 @@ inline void cuda_mat_uncompress(dim3 Gr, dim3 Bl, BaseFloat *dest,
+   cuda_uncompress_uint16(Gr, Bl, dest, dim, src, src_stride, scale);
+ }
+ 
++//////////////////////////////////////////////////////
++////           FSMN kernel functions          ///////
++////////////////////////////////////////////////////
++inline void cuda_gen_memory(dim3 Gr, dim3 Bl, float *data, const float* in, const float *l_filter, const float* r_filter,  
++                            float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  cudaF_gen_memory(Gr, Bl, data, in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++inline void cuda_gen_memory(dim3 Gr, dim3 Bl, double *data, const double* in, const double *l_filter, const double* r_filter, 
++                            float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  cudaD_gen_memory(Gr, Bl, data, in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++inline void cuda_memory_err_back(dim3 Gr, dim3 Bl, float *data, const float* in, const float *l_filter, const float* r_filter, 
++                                 float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  cudaF_memory_err_back(Gr, Bl, data, in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++inline void cuda_memory_err_back(dim3 Gr, dim3 Bl, double *data, const double* in, const double *l_filter, const double* r_filter, 
++                                float* flags, MatrixDim d, int l_order, int r_order, int l_stride, int r_stride)
++{
++  cudaD_memory_err_back(Gr, Bl, data, in, l_filter, r_filter, flags, d, l_order, r_order, l_stride, r_stride);
++}
++
++inline void cuda_gen_uni_memory(dim3 Gr, dim3 Bl, float *data, const float* in, const float *l_filter, float* flags, MatrixDim d, 
++                                int l_order, int l_stride)
++{
++  cudaF_gen_uni_memory(Gr, Bl, data, in, l_filter, flags, d, l_order, l_stride);
++}
++
++inline void cuda_gen_uni_memory(dim3 Gr, dim3 Bl, double *data, const double* in, const double *l_filter, float* flags, MatrixDim d, 
++                                int l_order, int l_stride)
++{
++  cudaD_gen_uni_memory(Gr, Bl, data, in, l_filter, flags, d, l_order, l_stride);
++}
++
++inline void cuda_uni_memory_err_back(dim3 Gr, dim3 Bl, float *data, const float* in, const float *l_filter, float* flags, MatrixDim d, 
++                                     int l_order, int l_stride)
++{
++  cudaF_uni_memory_err_back(Gr, Bl, data, in, l_filter, flags, d, l_order, l_stride);
++}
++
++inline void cuda_uni_memory_err_back(dim3 Gr, dim3 Bl, double *data, const double* in, const double *l_filter, float* flags, MatrixDim d, 
++                                     int l_order, int l_stride)
++{
++  cudaD_uni_memory_err_back(Gr, Bl, data, in, l_filter, flags, d, l_order, l_stride);
++}
++
++inline void cuda_get_l_filter_err(dim3 Gr, dim3 Bl, float *data, const float *diff, const float* in, float* flags, MatrixDim d, 
++                                  int l_order, int l_stride, float lr)
++{
++  cudaF_get_l_filter_err(Gr, Bl, data, diff, in, flags, d, l_order, l_stride, lr);
++}
++
++inline void cuda_get_l_filter_err(dim3 Gr, dim3 Bl, double *data, const double *diff, const double* in, float* flags, MatrixDim d, 
++                                  int l_order, int l_stride, float lr)
++{
++  cudaD_get_l_filter_err(Gr, Bl, data, diff, in, flags, d, l_order, l_stride, lr);
++}
++
++inline void cuda_get_r_filter_err(dim3 Gr, dim3 Bl, float *data, const float *diff, const float* in, float* flags, MatrixDim d,
++                                  int r_order, int r_stride, float lr)
++{
++  cudaF_get_r_filter_err(Gr, Bl, data, diff, in, flags, d, r_order, r_stride, lr);
++}
++
++inline void cuda_get_r_filter_err(dim3 Gr, dim3 Bl, double *data, const double *diff, const double* in, float* flags, MatrixDim d, 
++                                  int r_order, int r_stride, float lr)
++{
++  cudaD_get_r_filter_err(Gr, Bl, data, diff, in, flags, d, r_order, r_stride, lr);
++}
+ 
+ } // namespace kaldi
+ 
+diff --git a/src/cudamatrix/cu-matrix.cc b/src/cudamatrix/cu-matrix.cc
+index beccd9d..423b2e2 100644
+--- a/src/cudamatrix/cu-matrix.cc
++++ b/src/cudamatrix/cu-matrix.cc
+@@ -8,6 +8,8 @@
+ //           2013-2015  Guoguo Chen
+ //           2016-2017  Shiyin Kang
+ //                2017  Hossein Hadian
++//                2018 Alibaba.Inc (Author: ShiLiang Zhang)
++
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -3422,6 +3424,208 @@ void CuMatrixBase<Real>::EqualElementMask(const CuMatrixBase<Real> &mat, CuMatri
+   }
+ }
+ 
++//////////////////////////////////////////////////////
++////           FSMN kernel functions          ///////
++////////////////////////////////////////////////////
++template<typename Real>
++void CuMatrixBase<Real>::GenMemory(const CuMatrixBase<Real>& in, const CuMatrixBase<Real>& l_filter, const CuMatrixBase<Real>& r_filter,
++                                   CuVectorBase<BaseFloat> &flags, int l_order, int r_order, int l_stride, int r_stride) {
++  // Check the inputs:
++  KALDI_ASSERT(in.NumRows() == NumRows() && in.NumCols() == NumCols());
++
++#if HAVE_CUDA == 1
++  if (CuDevice::Instantiate().Enabled()) {
++    CuTimer tim;
++
++    KALDI_ASSERT(num_cols_ == in.NumCols());
++    KALDI_ASSERT(num_rows_ == in.NumRows());
++
++    dim3 dimBlock(CU1DBLOCK);
++
++    dim3 dimGrid(n_blocks(in.NumCols()*in.NumRows(), CU1DBLOCK));
++
++    cuda_gen_memory(dimGrid, dimBlock, this->data_, in.data_, l_filter.data_, r_filter.data_, flags.Data(), 
++        in.Dim(), l_order, r_order, l_stride, r_stride);
++    CU_SAFE_CALL(cudaGetLastError());
++
++    CuDevice::Instantiate().AccuProfile(__func__, tim);
++  }else
++#endif
++  {
++    Real *data = this->data_;
++    const Real *src_data = in.data_;
++    const Real *LF = l_filter.data_;
++    const Real *RF = r_filter.data_;
++    int shift_index = 0;
++    int rows = NumRows();
++    int cols = NumCols();
++    int stride = in.Stride();
++    for (int32 r = 0; r < rows; r++) {
++      for (int32 c = 0; c < cols; c++) {
++        int index = r*stride + c;
++        data[index] = src_data[index];
++        for (int order = 0; order < l_order; order++)
++        {
++          shift_index = r - order*l_stride;
++          if (shift_index >= 0)
++          {
++            data[index] += src_data[shift_index*stride + c] * LF[order*stride + c];
++          }
++        }
++        for (int order = 1; order < r_order + 1; order++)
++        {
++          shift_index = r + order*r_stride;
++          if (shift_index < rows)
++          {
++            data[index] += src_data[shift_index*stride + c] * RF[(order - 1)*stride + c];
++          }
++        }
++      }
++    }
++  }
++}
++
++template<typename Real>
++void CuMatrixBase<Real>::MemoryErrBack(const CuMatrixBase<Real>& in, const CuMatrixBase<Real>& l_filter, const CuMatrixBase<Real>& r_filter,
++                                       CuVectorBase<BaseFloat> &flags, int l_order, int r_order, int l_stride, int r_stride) {
++#if HAVE_CUDA == 1
++  if (CuDevice::Instantiate().Enabled()) {
++    CuTimer tim;
++
++    KALDI_ASSERT(num_cols_ == in.NumCols());
++    KALDI_ASSERT(num_rows_ == in.NumRows());
++
++    dim3 dimBlock(CU1DBLOCK);
++    dim3 dimGrid(n_blocks(in.NumCols()*in.NumRows(), CU1DBLOCK));
++
++    cuda_memory_err_back(dimGrid, dimBlock, this->data_, in.data_, l_filter.data_, r_filter.data_, flags.Data(), 
++             in.Dim(), l_order, r_order, l_stride, r_stride);
++    
++    CU_SAFE_CALL(cudaGetLastError());
++
++    CuDevice::Instantiate().AccuProfile(__func__, tim);
++  }else
++#endif
++  {
++    //add CPU function
++  }
++}
++
++template<typename Real>
++void CuMatrixBase<Real>::GenUniMemory(const CuMatrixBase<Real>& in, const CuMatrixBase<Real>& l_filter, CuVectorBase<BaseFloat> &flags, 
++                                      int l_order, int l_stride) {
++
++  //Check the inputs:
++  KALDI_ASSERT(in.NumRows() == NumRows() && in.NumCols() == NumCols());
++
++#if HAVE_CUDA == 1
++  if (CuDevice::Instantiate().Enabled()) {
++    CuTimer tim;
++
++    KALDI_ASSERT(num_cols_ == in.NumCols());
++    KALDI_ASSERT(num_rows_ == in.NumRows());
++
++    dim3 dimBlock(CU1DBLOCK);
++
++    dim3 dimGrid(n_blocks(in.NumCols()*in.NumRows(), CU1DBLOCK));
++
++    cuda_gen_uni_memory(dimGrid, dimBlock, this->data_, in.data_, l_filter.data_, flags.Data(), in.Dim(), l_order, l_stride);
++    CU_SAFE_CALL(cudaGetLastError());
++
++    CuDevice::Instantiate().AccuProfile(__func__, tim);
++  }
++  else
++#endif
++  {
++    Real *data = this->data_;
++    const Real *src_data = in.data_;
++    const Real *LF = l_filter.data_;
++    int shift_index = 0;
++    int rows = NumRows();
++    int cols = NumCols();
++    int stride = in.Stride();
++    for (int32 r = 0; r < rows; r++) {
++      for (int32 c = 0; c < cols; c++) {
++        int index = r*stride + c;
++        data[index] = src_data[index];
++        for (int order = 0; order < l_order; order++)
++        {
++          shift_index = r - order*l_stride;
++          if (shift_index >= 0)
++          {
++            data[index] += src_data[shift_index*stride + c] * LF[order*stride + c];
++          }
++        }
++      }
++    }
++  }
++}
++
++template<typename Real>
++void CuMatrixBase<Real>::UniMemoryErrBack(const CuMatrixBase<Real>& in, const CuMatrixBase<Real>& l_filter, CuVectorBase<BaseFloat> &flags, 
++                                          int l_order, int l_stride) {
++#if HAVE_CUDA == 1
++  if (CuDevice::Instantiate().Enabled()) {
++    CuTimer tim;
++
++    KALDI_ASSERT(num_cols_ == in.NumCols());
++    KALDI_ASSERT(num_rows_ == in.NumRows());
++
++    dim3 dimBlock(CU1DBLOCK);
++    dim3 dimGrid(n_blocks(in.NumCols()*in.NumRows(), CU1DBLOCK));
++
++    cuda_uni_memory_err_back(dimGrid, dimBlock, this->data_, in.data_, l_filter.data_, flags.Data(), in.Dim(), l_order, l_stride);
++
++    CU_SAFE_CALL(cudaGetLastError());
++
++    CuDevice::Instantiate().AccuProfile(__func__, tim);
++  }
++#endif
++}
++
++
++template<typename Real>
++void CuMatrixBase<Real>::GetLfilterErr(const CuMatrixBase<Real>& diff, const CuMatrixBase<Real>& in, CuVectorBase<BaseFloat> &flags, 
++                                       int l_order, int l_stride, float lr) {
++#if HAVE_CUDA == 1
++  if (CuDevice::Instantiate().Enabled()) {
++    CuTimer tim;
++
++    KALDI_ASSERT(num_cols_ == diff.NumCols());
++    KALDI_ASSERT(num_rows_ == l_order);
++
++    dim3 dimBlock(CU1DBLOCK);
++    dim3 dimGrid(diff.NumCols()*l_order);
++
++    cuda_get_l_filter_err(dimGrid, dimBlock, this->data_, diff.data_, in.data_, flags.Data(), diff.Dim(), l_order, l_stride, lr);
++    CU_SAFE_CALL(cudaGetLastError());
++
++    CuDevice::Instantiate().AccuProfile(__func__, tim);
++  }
++#endif
++}
++
++template<typename Real>
++void CuMatrixBase<Real>::GetRfilterErr(const CuMatrixBase<Real>& diff, const CuMatrixBase<Real>& in, CuVectorBase<BaseFloat> &flags, 
++                                       int r_order, int r_stride,  float lr) {
++#if HAVE_CUDA == 1
++  if (CuDevice::Instantiate().Enabled()) {
++    CuTimer tim;
++
++    KALDI_ASSERT(num_cols_ == diff.NumCols());
++    KALDI_ASSERT(num_rows_ == r_order);
++
++    dim3 dimBlock(CU1DBLOCK);
++    dim3 dimGrid(diff.NumCols()*r_order);
++
++    cuda_get_r_filter_err(dimGrid, dimBlock, this->data_, diff.data_, in.data_, flags.Data(), diff.Dim(), r_order, r_stride, lr);
++    
++    CU_SAFE_CALL(cudaGetLastError());
++
++    CuDevice::Instantiate().AccuProfile(__func__, tim);
++  }
++#endif
++}
+ 
+ /**
+  * Print the matrix to stream
+@@ -3447,9 +3651,4 @@ template class CuMatrixBase<float>;
+ template class CuMatrixBase<double>;
+ 
+ 
+-
+-
+-
+-
+-
+ } // namespace kaldi
+diff --git a/src/cudamatrix/cu-matrix.h b/src/cudamatrix/cu-matrix.h
+index 85aa4c0..7a8eb3e 100644
+--- a/src/cudamatrix/cu-matrix.h
++++ b/src/cudamatrix/cu-matrix.h
+@@ -6,6 +6,7 @@
+ //                2013  Xiaohui Zhang
+ //           2013-2015  Guoguo Chen
+ //                2017  Shiyin Kang
++//                2018 Alibaba.Inc (Author: ShiLiang Zhang)
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -693,14 +694,42 @@ class CuMatrixBase {
+ 
+   // The following two functions should only be called if we did not compile
+   // with CUDA or could not get a CUDA card; in that case the contents are
+-  // interpreted the same as a regular matrix.  DON'T USE THESE UNLESS YOU KNOW
+-  // WHAT YOU ARE DOING!
++  // interpreted the same as a regular matrix.  Don't use these unless you know
++  // what you are doing!
+   inline const MatrixBase<Real> &Mat() const {
+     return *(reinterpret_cast<const MatrixBase<Real>* >(this));
+   }
+   inline MatrixBase<Real> &Mat() {
+     return *(reinterpret_cast<MatrixBase<Real>* >(this));
+   }
++  
++  //////////////////////////////////////////////////////
++  ////           FSMN kernel functions          ///////
++  ////////////////////////////////////////////////////
++
++  // forward operation in memory block
++  void GenMemory(const CuMatrixBase<Real> &in, const CuMatrixBase<Real> &l_filter_, const CuMatrixBase<Real> &r_filter_, 
++		CuVectorBase<BaseFloat> &flags_, int l_order_, int r_order_, int l_stride_, int r_stride_);
++
++  // backward operation in memory block
++  void MemoryErrBack(const CuMatrixBase<Real> &in, const CuMatrixBase<Real> &l_filter_, const CuMatrixBase<Real> &r_filter_,
++		CuVectorBase<BaseFloat> &flags_, int l_order_, int r_order_, int l_stride_, int r_stride_);
++
++  // update the look-back filter in memory blcok
++  void GetLfilterErr(const CuMatrixBase<Real> &diff, const CuMatrixBase<Real> &in, CuVectorBase<BaseFloat> &flags_, 
++		int l_order_, int l_stride_, float lr);
++
++  // update the lookahead filter in memory blcok
++  void GetRfilterErr(const CuMatrixBase<Real> &diff, const CuMatrixBase<Real> &in, CuVectorBase<BaseFloat> &flags_,  
++		int r_order_, int r_stride_, float lr);
++ 
++  // forward operation in unidirectional memory block
++  void GenUniMemory(const CuMatrixBase<Real> &in, const CuMatrixBase<Real> &l_filter_, CuVectorBase<BaseFloat> &flags_, 
++		int l_order_, int l_stride_);
++
++  // backward operation in unidirectional memory block
++  void UniMemoryErrBack(const CuMatrixBase<Real> &in, const CuMatrixBase<Real> &l_filter_, CuVectorBase<BaseFloat> &flags_, 
++		int l_order_, int l_stride_);
+ 
+  protected:
+ 
+diff --git a/src/featbin/Makefile b/src/featbin/Makefile
+index 8e72d0f..81bf67e 100644
+--- a/src/featbin/Makefile
++++ b/src/featbin/Makefile
+@@ -17,7 +17,7 @@ BINFILES = add-deltas add-deltas-sdc append-post-to-feats \
+            process-kaldi-pitch-feats process-pitch-feats \
+            select-feats shift-feats splice-feats subsample-feats \
+            subset-feats transform-feats wav-copy wav-reverberate \
+-           wav-to-duration
++           wav-to-duration append-ivector-to-feats
+ 
+ OBJFILES =
+ 
+diff --git a/src/featbin/append-ivector-to-feats.cc b/src/featbin/append-ivector-to-feats.cc
+new file mode 100644
+index 0000000..25c0569
+--- /dev/null
++++ b/src/featbin/append-ivector-to-feats.cc
+@@ -0,0 +1,231 @@
++// featbin/append-ivector-to-feats.cc
++
++// Copyright 2012 Korbinian Riedhammer
++//           2013 Brno University of Technology (Author: Karel Vesely)
++//           2013-2014 Johns Hopkins University (Author: Daniel Povey)
++//           2018 Alibaba (Author: Shaofei Xue) 
++
++// See ../../COPYING for clarification regarding multiple authors
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//  http://www.apache.org/licenses/LICENSE-2.0
++//
++// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
++// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
++// MERCHANTABLITY OR NON-INFRINGEMENT.
++// See the Apache 2 License for the specific language governing permissions and
++// limitations under the License.
++
++
++#include "base/kaldi-common.h"
++#include "util/common-utils.h"
++#include "matrix/kaldi-matrix.h"
++
++namespace kaldi {
++
++	void AppendPeriodVectorToFeats(const Matrix<BaseFloat> &in,
++		const Matrix<BaseFloat> &vec,
++		int32 period,
++		Matrix<BaseFloat> *out) {
++		KALDI_ASSERT(in.NumRows() != 0);
++		KALDI_ASSERT((in.NumRows() + period - 1) / period == vec.NumRows());
++		out->Resize(in.NumRows(), in.NumCols() + vec.NumCols());
++		out->Range(0, in.NumRows(),
++			0, in.NumCols()).CopyFromMat(in);
++
++		for (int i = 0; i < vec.NumRows()-1; i++)
++		{
++			out->Range(i*period, period,
++			in.NumCols(), vec.NumCols()).CopyRowsFromVec(vec.Row(i));
++	    }
++		out->Range((vec.NumRows() - 1)*period, out->NumRows() - (vec.NumRows() - 1)*period,
++			in.NumCols(), vec.NumCols()).CopyRowsFromVec(vec.Row(vec.NumRows() - 1));
++
++}
++void AppendVectorToFeats(const Matrix<BaseFloat> &in,
++	const Vector<BaseFloat> &vec,
++	Matrix<BaseFloat> *out) {
++	KALDI_ASSERT(in.NumRows() != 0);
++	out->Resize(in.NumRows(), in.NumCols() + vec.Dim());
++    out->ColRange(0, in.NumCols()).CopyFromMat(in);
++    out->ColRange(in.NumCols(), vec.Dim()).CopyRowsFromVec(vec);
++
++}
++
++}
++
++int main(int argc, char *argv[]) {
++	try {
++		using namespace kaldi;
++		using namespace std;
++
++		const char *usage =
++			"Append i-vector to each row of input feature files\n"
++			"\n"
++			"Usage: append-ivector-to-feats <in-featspecifier> <in-ivectorspecifier> <out-wspecifier>\n"
++			" or: append-vector-to-feats <in-featfilename1> <in-ivectorfilename> <out-wxfilename>\n"
++			"See also: paste-feats, concat-feats\n";
++
++		ParseOptions po(usage);
++
++		bool binary = true;
++		int online_ivector_period = 1;
++		po.Register("binary", &binary, "If true, output files in binary "
++			"(only relevant for single-file operation, i.e. no tables)");
++		po.Register("online-ivector-period", &online_ivector_period, "Number of "
++			"frames between iVectors in matrices supplied to the "
++			"--online-ivectors option");
++
++		po.Read(argc, argv);
++
++		if (po.NumArgs() != 3) {
++			po.PrintUsage();
++			exit(1);
++		}
++
++		if (online_ivector_period == 1)
++		{
++			if (ClassifyRspecifier(po.GetArg(1), NULL, NULL)
++				!= kNoRspecifier) {
++				// We're operating on tables, e.g. archives.
++
++
++				string feat_rspecifier = po.GetArg(1);
++				SequentialBaseFloatMatrixReader feat_reader(feat_rspecifier);
++
++				string vec_rspecifier = po.GetArg(2);
++				RandomAccessBaseFloatVectorReader vec_reader(vec_rspecifier);
++
++				string wspecifier = po.GetArg(3);
++				BaseFloatMatrixWriter feat_writer(wspecifier);
++
++				int32 num_done = 0, num_err = 0;
++				// Main loop
++				for (; !feat_reader.Done(); feat_reader.Next()) {
++					string utt = feat_reader.Key();
++					KALDI_VLOG(2) << "Processing utterance " << utt;
++
++					const Matrix<BaseFloat> &feats(feat_reader.Value());
++
++					if (!vec_reader.HasKey(utt)) {
++						KALDI_WARN << "Could not read vector for utterance " << utt;
++						num_err++;
++						continue;
++					}
++					const Vector<BaseFloat> &vec(vec_reader.Value(utt));
++
++					Matrix<BaseFloat> output;
++					AppendVectorToFeats(feats, vec, &output);
++					feat_writer.Write(utt, output);
++					num_done++;
++				}
++				KALDI_LOG << "Done " << num_done << " utts, errors on "
++					<< num_err;
++
++				return (num_done == 0 ? -1 : 0);
++			}
++			else {
++				// We're operating on rxfilenames|wxfilenames, most likely files.
++				Matrix<BaseFloat> mat;
++				ReadKaldiObject(po.GetArg(1), &mat);
++				Vector<BaseFloat> vec;
++				ReadKaldiObject(po.GetArg(2), &vec);
++				Matrix<BaseFloat> output;
++				AppendVectorToFeats(mat, vec, &output);
++				std::string output_wxfilename = po.GetArg(3);
++				WriteKaldiObject(output, output_wxfilename, binary);
++				KALDI_LOG << "Wrote appended features to " << output_wxfilename;
++				return 0;
++			}
++		}
++		else{
++			if (ClassifyRspecifier(po.GetArg(1), NULL, NULL)
++				!= kNoRspecifier) {
++				// We're operating on tables, e.g. archives.
++
++
++				string feat_rspecifier = po.GetArg(1);
++				SequentialBaseFloatMatrixReader feat_reader(feat_rspecifier);
++
++				string vec_rspecifier = po.GetArg(2);
++				RandomAccessBaseFloatMatrixReader vec_reader(vec_rspecifier);
++
++				string wspecifier = po.GetArg(3);
++				BaseFloatMatrixWriter feat_writer(wspecifier);
++
++				int32 num_done = 0, num_err = 0;
++				// Main loop
++				for (; !feat_reader.Done(); feat_reader.Next()) {
++					string utt = feat_reader.Key();
++					KALDI_VLOG(2) << "Processing utterance " << utt;
++
++					const Matrix<BaseFloat> &feats(feat_reader.Value());
++
++					if (!vec_reader.HasKey(utt)) {
++						KALDI_WARN << "Could not read vector for utterance " << utt;
++						num_err++;
++						continue;
++					}
++					const Matrix<BaseFloat> &vec(vec_reader.Value(utt));
++
++					Matrix<BaseFloat> output;
++					AppendPeriodVectorToFeats(feats, vec, online_ivector_period, &output);
++					feat_writer.Write(utt, output);
++					num_done++;
++				}
++				KALDI_LOG << "Done " << num_done << " utts, errors on "
++					<< num_err;
++
++				return (num_done == 0 ? -1 : 0);
++			}
++			else {
++				// We're operating on rxfilenames|wxfilenames, most likely files.
++				Matrix<BaseFloat> mat;
++				ReadKaldiObject(po.GetArg(1), &mat);
++				Matrix<BaseFloat> vec;
++				ReadKaldiObject(po.GetArg(2), &vec);
++				Matrix<BaseFloat> output;
++				AppendPeriodVectorToFeats(mat, vec, online_ivector_period, &output);
++				std::string output_wxfilename = po.GetArg(3);
++				WriteKaldiObject(output, output_wxfilename, binary);
++				KALDI_LOG << "Wrote appended features to " << output_wxfilename;
++				return 0;
++			}
++		}
++	
++
++
++  } catch(const std::exception &e) {
++    std::cerr << e.what();
++    return -1;
++  }
++}
++
++/*
++  Testing:
++
++cat <<EOF >1.mat
++[ 0 1 2
++  3 4 5
++  8 9 10 ]
++EOF
++cat <<EOF > 2.vec
++ [ 0 1 ]
++EOF
++append-vector-to-feats --binary=false 1.mat 2.vec 3a.mat
++cat <<EOF > 3b.mat
++ [ 0 1 2 0 1
++   3 4 5 0 1
++   8 9 10 0 1 ]
++EOF
++cmp <(../bin/copy-matrix 3b.mat -) <(../bin/copy-matrix 3a.mat -) || echo 'Bad!'
++
++append-vector-to-feats 'scp:echo foo 1.mat|' 'scp:echo foo 2.vec|' 'scp,t:echo foo 3a.mat|'
++cmp <(../bin/copy-matrix 3b.mat -) <(../bin/copy-matrix 3a.mat -) || echo 'Bad!'
++
++rm {1,3?}.mat 2.vec
++ */
+diff --git a/src/nnet/nnet-affine-transform.h b/src/nnet/nnet-affine-transform.h
+index 0dc84fa..33cce94 100644
+--- a/src/nnet/nnet-affine-transform.h
++++ b/src/nnet/nnet-affine-transform.h
+@@ -1,7 +1,8 @@
+ // nnet/nnet-affine-transform.h
+ 
+ // Copyright 2011-2014  Brno University of Technology (author: Karel Vesely)
+-
++//           2018 Alibaba.Inc (Author: ShiLiang Zhang) 
++             	
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+ // Licensed under the Apache License, Version 2.0 (the "License");
+@@ -47,6 +48,7 @@ class AffineTransform : public UpdatableComponent {
+   void InitData(std::istream &is) {
+     // define options
+     float bias_mean = -2.0, bias_range = 2.0, param_stddev = 0.1;
++    int xavier_flag = 0;
+     // parse config
+     std::string token;
+     while (is >> std::ws, !is.eof()) {
+@@ -57,19 +59,29 @@ class AffineTransform : public UpdatableComponent {
+       else if (token == "<LearnRateCoef>") ReadBasicType(is, false, &learn_rate_coef_);
+       else if (token == "<BiasLearnRateCoef>") ReadBasicType(is, false, &bias_learn_rate_coef_);
+       else if (token == "<MaxNorm>") ReadBasicType(is, false, &max_norm_);
++      else if (token == "<Xavier>") ReadBasicType(is, false, &xavier_flag);
+       else KALDI_ERR << "Unknown token " << token << ", a typo in config?"
+                      << " (ParamStddev|BiasMean|BiasRange|LearnRateCoef|BiasLearnRateCoef)";
+     }
+ 
+     //
+     // Initialize trainable parameters,
+-    //
+-    // Gaussian with given std_dev (mean = 0),
+-    linearity_.Resize(OutputDim(), InputDim());
+-    RandGauss(0.0, param_stddev, &linearity_);
+-    // Uniform,
+-    bias_.Resize(OutputDim());
+-    RandUniform(bias_mean, bias_range, &bias_);
++    // if Xavier_flag=1, use the “Xavier” initialization
++    if(xavier_flag){
++      float range = sqrt(6)/sqrt(OutputDim() + InputDim());
++      linearity_.Resize(OutputDim(), InputDim(), kSetZero);
++      RandUniform(0.0, range, &linearity_);
++
++      bias_.Resize(OutputDim(),kSetZero);
++    }
++    else{
++      // Gaussian with given std_dev (mean = 0),
++      linearity_.Resize(OutputDim(), InputDim());
++      RandGauss(0.0, param_stddev, &linearity_);
++      // Uniform,
++      bias_.Resize(OutputDim());
++      RandUniform(bias_mean, bias_range, &bias_);
++    }
+   }
+ 
+   void ReadData(std::istream &is, bool binary) {
+diff --git a/src/nnet/nnet-component.cc b/src/nnet/nnet-component.cc
+index 34f9889..a177354 100644
+--- a/src/nnet/nnet-component.cc
++++ b/src/nnet/nnet-component.cc
+@@ -1,6 +1,7 @@
+ // nnet/nnet-component.cc
+ 
+ // Copyright 2011-2013  Brno University of Technology (Author: Karel Vesely)
++//           2018 Alibaba.Inc (Author: ShaoFei Xue, ShiLiang Zhang) 
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -49,6 +50,11 @@
+ #include "nnet/nnet-multibasis-component.h"
+ #include "nnet/nnet-parametric-relu.h"
+ 
++#include "nnet/nnet-fsmn.h"
++#include "nnet/nnet-deep-fsmn.h"
++#include "nnet/nnet-uni-fsmn.h"
++#include "nnet/nnet-uni-deep-fsmn.h"
++
+ namespace kaldi {
+ namespace nnet1 {
+ 
+@@ -85,6 +91,10 @@ const struct Component::key_value Component::kMarkerMap[] = {
+   { Component::kFramePoolingComponent, "<FramePoolingComponent>" },
+   { Component::kParallelComponent, "<ParallelComponent>" },
+   { Component::kMultiBasisComponent, "<MultiBasisComponent>" },
++  { Component::kFsmn, "<Fsmn>" },
++  { Component::kDeepFsmn, "<DeepFsmn>" },
++  { Component::kUniFsmn, "<UniFsmn>" },
++  { Component::kUniDeepFsmn, "<UniDeepFsmn>" },
+ };
+ 
+ 
+@@ -208,6 +218,18 @@ Component* Component::NewComponentOfType(ComponentType comp_type,
+     case Component::kMultiBasisComponent :
+       ans = new MultiBasisComponent(input_dim, output_dim);
+       break;
++    case Component::kFsmn:
++      ans = new Fsmn(input_dim, output_dim);
++      break;
++    case Component::kDeepFsmn:
++      ans = new DeepFsmn(input_dim, output_dim);
++      break;
++    case Component::kUniFsmn:
++      ans = new UniFsmn(input_dim, output_dim);
++      break;
++    case Component::kUniDeepFsmn:
++      ans = new UniDeepFsmn(input_dim, output_dim);
++      break;
+     case Component::kUnknown :
+     default :
+       KALDI_ERR << "Missing type: " << TypeToMarker(comp_type);
+diff --git a/src/nnet/nnet-component.h b/src/nnet/nnet-component.h
+index 2ef5662..c6e0c63 100644
+--- a/src/nnet/nnet-component.h
++++ b/src/nnet/nnet-component.h
+@@ -1,6 +1,7 @@
+ // nnet/nnet-component.h
+ 
+ // Copyright 2011-2016  Brno University of Technology (Author: Karel Vesely)
++//           2018 Alibaba.Inc (Author: ShiLiang Zhang) 
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -84,7 +85,13 @@ class Component {
+     kMaxPooling2DComponent,
+     kFramePoolingComponent,
+     kParallelComponent,
+-    kMultiBasisComponent
++    kMultiBasisComponent,
++
++    //FSMN
++    kFsmn,
++    kDeepFsmn,
++    kUniFsmn,
++    kUniDeepFsmn,
+   } ComponentType;
+ 
+   /// A pair of type and marker,
+diff --git a/src/nnet/nnet-deep-fsmn.h b/src/nnet/nnet-deep-fsmn.h
+new file mode 100644
+index 0000000..fa07d54
+--- /dev/null
++++ b/src/nnet/nnet-deep-fsmn.h
+@@ -0,0 +1,350 @@
++// nnet/nnet-deep-fsmn.h
++
++// Copyright 2018 Alibaba.Inc (Author: Shiliang Zhang) 
++//
++// See ../../COPYING for clarification regarding multiple authors
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//  http://www.apache.org/licenses/LICENSE-2.0
++//
++// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
++// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
++// MERCHANTABLITY OR NON-INFRINGEMENT.
++// See the Apache 2 License for the specific language governing permissions and
++// limitations under the License.
++
++
++#ifndef KALDI_NNET_NNET_DEEP_FSMN_H_
++#define KALDI_NNET_NNET_DEEP_FSMN_H_
++
++
++#include "nnet/nnet-component.h"
++#include "nnet/nnet-utils.h"
++#include "cudamatrix/cu-math.h"
++#include "cudamatrix/cu-kernels.h"
++
++namespace kaldi {
++namespace nnet1 {
++ class DeepFsmn : public UpdatableComponent {
++  public:
++   DeepFsmn(int32 dim_in, int32 dim_out)
++     : UpdatableComponent(dim_in, dim_out),
++     learn_rate_coef_(1.0)
++   {
++   }
++   ~DeepFsmn()
++   { }
++
++   Component* Copy() const { return new DeepFsmn(*this); }
++   ComponentType GetType() const { return kDeepFsmn; }
++
++   void SetFlags(const Vector<BaseFloat> &flags) {
++     flags_.Resize(flags.Dim(), kSetZero);
++     flags_.CopyFromVec(flags);
++   }
++
++   void InitData(std::istream                                                     &is) {
++     // define options
++     float learn_rate_coef = 1.0;
++     int hid_size;
++     int l_order = 1, r_order = 1;
++     int l_stride = 1, r_stride = 1;
++     float range = 0.0;
++     // parse config
++     std::string token;
++     while (is >> std::ws, !is.eof()) {
++       ReadToken(is, false, &token);
++       /**/ if (token == "<LearnRateCoef>") ReadBasicType(is, false, &learn_rate_coef);
++       else if (token == "<HidSize>") ReadBasicType(is, false, &hid_size);
++       else if (token == "<LOrder>") ReadBasicType(is, false, &l_order);
++       else if (token == "<ROrder>") ReadBasicType(is, false, &r_order);
++       else if (token == "<LStride>") ReadBasicType(is, false, &l_stride);
++       else if (token == "<RStride>") ReadBasicType(is, false, &r_stride);
++       else KALDI_ERR << "Unknown token " << token << ", a typo in config?"
++         << " (LearnRateCoef|HidSize|LOrder|ROrder|LStride|LStride)";
++     }
++     //parameters
++     learn_rate_coef_ = learn_rate_coef;
++     l_order_ = l_order;
++     r_order_ = r_order;
++     l_stride_ = l_stride;
++     r_stride_ = r_stride;
++     hid_size_ = hid_size;
++     // initialize 
++     range = sqrt(6)/sqrt(l_order_ + output_dim_);
++     l_filter_.Resize(l_order_, output_dim_, kSetZero);
++     RandUniform(0.0, range, &l_filter_);
++
++     range = sqrt(6)/sqrt(r_order_ + input_dim_);
++     r_filter_.Resize(r_order_, output_dim_, kSetZero);
++     RandUniform(0.0, range, &r_filter_);
++
++     //linear transform
++     range = sqrt(6)/sqrt(hid_size_ + output_dim_);
++     p_weight_.Resize(output_dim_, hid_size_, kSetZero);
++     RandUniform(0.0, range, &p_weight_);
++
++     ///affine transform + nonlinear activation
++     range = sqrt(6)/sqrt(hid_size_ + input_dim_);
++     linearity_.Resize(hid_size_, input_dim_, kSetZero);
++     RandUniform(0.0, range, &linearity_);
++
++     bias_.Resize(hid_size_, kSetZero);
++
++     //gradient related
++     p_weight_corr_.Resize(output_dim_, hid_size_, kSetZero);
++     linearity_corr_.Resize(hid_size_, input_dim_, kSetZero);
++     bias_corr_.Resize(hid_size_, kSetZero);
++   }
++
++   void ReadData(std::istream &is, bool binary) {
++     // optional learning-rate coefs
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LearnRateCoef>");
++       ReadBasicType(is, binary, &learn_rate_coef_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<HidSize>");
++       ReadBasicType(is, binary, &hid_size_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LOrder>");
++       ReadBasicType(is, binary, &l_order_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<ROrder>");
++       ReadBasicType(is, binary, &r_order_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LStride>");
++       ReadBasicType(is, binary, &l_stride_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<RStride>");
++       ReadBasicType(is, binary, &r_stride_);
++     }        
++     // weights
++     l_filter_.Read(is, binary);
++     r_filter_.Read(is, binary);
++     p_weight_.Read(is, binary);
++     linearity_.Read(is, binary);
++     bias_.Read(is, binary);
++     KALDI_ASSERT(l_filter_.NumRows() == l_order_);
++     KALDI_ASSERT(l_filter_.NumCols() == input_dim_);
++     KALDI_ASSERT(r_filter_.NumRows() == r_order_);
++     KALDI_ASSERT(r_filter_.NumCols() == input_dim_);
++     KALDI_ASSERT(p_weight_.NumRows() == output_dim_);
++     KALDI_ASSERT(p_weight_.NumCols() == hid_size_);
++     KALDI_ASSERT(linearity_.NumRows() == hid_size_);
++     KALDI_ASSERT(linearity_.NumCols() == input_dim_);
++     KALDI_ASSERT(bias_.Dim() == hid_size_);
++
++     //gradient related
++     p_weight_corr_.Resize(output_dim_, hid_size_, kSetZero);
++     linearity_corr_.Resize(hid_size_, input_dim_, kSetZero);
++     bias_corr_.Resize(hid_size_, kSetZero);
++   }
++
++   void WriteData(std::ostream &os, bool binary) const {
++     WriteToken(os, binary, "<LearnRateCoef>");
++     WriteBasicType(os, binary, learn_rate_coef_);
++     WriteToken(os, binary, "<HidSize>");
++     WriteBasicType(os, binary, hid_size_);
++     WriteToken(os, binary, "<LOrder>");
++     WriteBasicType(os, binary, l_order_);
++     WriteToken(os, binary, "<ROrder>");
++     WriteBasicType(os, binary, r_order_);
++     WriteToken(os, binary, "<LStride>");
++     WriteBasicType(os, binary, l_stride_);
++     WriteToken(os, binary, "<RStride>");
++     WriteBasicType(os, binary, r_stride_);
++     // weights
++     l_filter_.Write(os, binary);
++     r_filter_.Write(os, binary);
++     p_weight_.Write(os, binary);
++     linearity_.Write(os, binary);
++     bias_.Write(os, binary);
++
++   }
++
++   void ResetMomentum(void)
++   {
++     p_weight_corr_.Set(0.0);
++     linearity_corr_.Set(0.0);
++     bias_corr_.Set(0.0);
++   }
++
++   int32 NumParams() const { 
++     return l_filter_.NumRows()*l_filter_.NumCols() + r_filter_.NumRows()*r_filter_.NumCols() + p_weight_.NumRows()*p_weight_.NumCols() 
++       + linearity_.NumRows()*linearity_.NumCols() + bias_.Dim();
++   }
++
++   void GetParams(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     int32 r_filter_num_elem = r_filter_.NumRows() * r_filter_.NumCols();
++     int32 p_weight_num_elem = p_weight_.NumRows()*p_weight_.NumCols();
++     int32 linearity_num_elem = linearity_.NumRows()*linearity_.NumCols();
++     int32 offset=0;
++     wei_copy->Range(offset, l_filter_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(l_filter_));
++     offset += l_filter_num_elem;
++     wei_copy->Range(offset, r_filter_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(r_filter_));
++     offset += r_filter_num_elem;
++     wei_copy->Range(offset, p_weight_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(p_weight_));
++     offset += p_weight_num_elem;
++     wei_copy->Range(offset, linearity_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(linearity_));
++     offset += linearity_num_elem;
++     wei_copy->Range(offset, bias_.Dim()).CopyFromVec(Vector<BaseFloat>(bias_));
++   }
++
++   void SetParams(const VectorBase<BaseFloat> &wei_copy) {
++     KALDI_ASSERT(wei_copy.Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     int32 r_filter_num_elem = r_filter_.NumRows() * r_filter_.NumCols();
++     int32 p_weight_num_elem = p_weight_.NumRows()*p_weight_.NumCols();
++     int32 linearity_num_elem = linearity_.NumRows()*linearity_.NumCols();
++     int32 offset = 0;
++     l_filter_.CopyRowsFromVec(wei_copy.Range(offset, l_filter_num_elem));
++     offset += l_filter_num_elem;
++     r_filter_.CopyRowsFromVec(wei_copy.Range(offset, r_filter_num_elem));
++     offset += r_filter_num_elem;
++     p_weight_.CopyRowsFromVec(wei_copy.Range(offset, p_weight_num_elem));
++     offset += p_weight_num_elem;
++     linearity_.CopyRowsFromVec(wei_copy.Range(offset, linearity_num_elem));
++     offset += linearity_num_elem;
++     bias_.CopyFromVec(wei_copy.Range(offset, bias_.Dim()));
++   }
++
++   void GetGradient(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++     int32 p_weight_num_elem = p_weight_corr_.NumRows()*p_weight_corr_.NumCols();
++     int32 linearity_num_elem = linearity_corr_.NumRows()*linearity_corr_.NumCols();
++     int32 offset = 0;
++     wei_copy->Range(offset, p_weight_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(p_weight_corr_));
++     offset += p_weight_num_elem;
++     wei_copy->Range(offset, linearity_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(linearity_corr_));
++     offset += linearity_num_elem;
++     wei_copy->Range(offset, bias_.Dim()).CopyFromVec(Vector<BaseFloat>(bias_corr_));
++   }
++
++   std::string Info() const {
++     return std::string("\n  l_filter") + MomentStatistics(l_filter_) +
++       "\n  r_filter" + MomentStatistics(r_filter_) +
++       "\n  p_weight" + MomentStatistics(p_weight_) +
++       "\n  linearity" + MomentStatistics(linearity_) +
++       "\n  bias" + MomentStatistics(bias_);
++   }
++   std::string InfoGradient() const {
++     return std::string("\n, lr-coef ") + ToString(learn_rate_coef_) +
++       ", hid_size" + ToString(hid_size_) +
++       ", l_order " + ToString(l_order_) +
++       ", r_order " + ToString(r_order_) +
++       ", l_stride " + ToString(l_stride_) +
++       ", r_stride " + ToString(r_stride_);
++   }
++
++   void PropagateFnc(const CuMatrixBase<BaseFloat> &in, CuMatrixBase<BaseFloat> *out) {
++
++     int nframes = in.NumRows();
++     //////////////////////////////////////
++     //step1. nonlinear affine transform
++     hid_out_.Resize(nframes, hid_size_, kSetZero);
++     // pre copy bias
++     hid_out_.AddVecToRows(1.0, bias_, 0.0);
++     // multiply by weights^t
++     hid_out_.AddMatMat(1.0, in, kNoTrans, linearity_, kTrans, 1.0);
++     // Relu nonlinear activation function
++     hid_out_.ApplyFloor(0.0);
++
++     ////Step2. linear affine transform
++     p_out_.Resize(nframes, output_dim_, kSetZero);
++     p_out_.AddMatMat(1.0, hid_out_, kNoTrans, p_weight_, kTrans, 0.0);
++
++     ////Step3. fsmn layer
++     out->GenMemory(p_out_, l_filter_, r_filter_, flags_, l_order_, r_order_, l_stride_, r_stride_);
++
++     ///step4. skip connection
++     out->AddMat(1.0, in, kNoTrans);
++   }
++
++   void BackpropagateFnc(const CuMatrixBase<BaseFloat> &in, const CuMatrixBase<BaseFloat> &out,
++     const CuMatrixBase<BaseFloat> &out_diff, CuMatrixBase<BaseFloat> *in_diff) {
++     
++     int nframes = in.NumRows();
++     const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++     const BaseFloat mmt = opts_.momentum;
++     //Step 1. fsmn layer
++     p_out_err_.Resize(nframes, output_dim_, kSetZero);
++     p_out_err_.MemoryErrBack(out_diff, l_filter_, r_filter_, flags_, l_order_, r_order_, l_stride_, r_stride_);
++     l_filter_.GetLfilterErr(out_diff, p_out_, flags_, l_order_, l_stride_, lr);
++     r_filter_.GetRfilterErr(out_diff, p_out_, flags_, r_order_, r_stride_, lr);
++     
++     //Step 2. linear affine transform
++     // multiply error derivative by weights
++     hid_out_err_.Resize(nframes, hid_size_, kSetZero);
++     hid_out_err_.AddMatMat(1.0, p_out_err_, kNoTrans, p_weight_, kNoTrans, 0.0);
++     p_weight_corr_.AddMatMat(1.0, p_out_err_, kTrans, hid_out_, kNoTrans, mmt);
++
++     //Step3. nonlinear affine transform
++     hid_out_.ApplyHeaviside();
++     hid_out_err_.MulElements(hid_out_);
++
++     in_diff->AddMatMat(1.0, hid_out_err_, kNoTrans, linearity_, kNoTrans, 0.0);
++     linearity_corr_.AddMatMat(1.0, hid_out_err_, kTrans, in, kNoTrans, mmt);
++     bias_corr_.AddRowSumMat(1.0, hid_out_err_, mmt);
++
++     //Step4. skip connection
++     in_diff->AddMat(1.0, out_diff, kNoTrans);
++   }
++
++   void Update(const CuMatrixBase<BaseFloat> &input, const CuMatrixBase<BaseFloat> &diff) {
++     
++     const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++     const BaseFloat l2 = opts_.l2_penalty;
++
++     if (l2 != 0.0) {
++       linearity_.AddMat(-lr*l2, linearity_);
++       p_weight_.AddMat(-lr*l2,  p_weight_);
++     }
++     p_weight_.AddMat(-lr, p_weight_corr_);
++     linearity_.AddMat(-lr, linearity_corr_);
++     bias_.AddVec(-lr, bias_corr_);
++
++   }
++
++ private:
++   ///fsmn layer
++   CuMatrix<BaseFloat> l_filter_;
++   CuMatrix<BaseFloat> r_filter_;
++   CuVector<BaseFloat> flags_;
++
++   //linear affine transform
++   CuMatrix<BaseFloat> p_out_;
++   CuMatrix<BaseFloat> p_out_err_;
++   CuMatrix<BaseFloat> p_weight_;
++   CuMatrix<BaseFloat> p_weight_corr_;
++
++   ///affine transform + nonlinear activation
++   CuMatrix<BaseFloat> hid_out_;
++   CuMatrix<BaseFloat> hid_out_err_;
++   CuMatrix<BaseFloat> linearity_;
++   CuVector<BaseFloat> bias_;
++   CuMatrix<BaseFloat> linearity_corr_;
++   CuVector<BaseFloat> bias_corr_;
++
++   BaseFloat learn_rate_coef_;
++   int l_order_;
++   int r_order_;
++   int l_stride_;
++   int r_stride_;  
++   int hid_size_;
++ };
++
++} // namespace nnet1
++} // namespace kaldi
++
++#endif
+diff --git a/src/nnet/nnet-fsmn.h b/src/nnet/nnet-fsmn.h
+new file mode 100644
+index 0000000..30b5aa2
+--- /dev/null
++++ b/src/nnet/nnet-fsmn.h
+@@ -0,0 +1,211 @@
++// nnet/nnet-fsmn.h
++
++// Copyright 2018 Alibaba.Inc (Author: ShiLiang Zhang) 
++
++// See ../../COPYING for clarification regarding multiple authors
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//  http://www.apache.org/licenses/LICENSE-2.0
++//
++// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
++// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
++// MERCHANTABLITY OR NON-INFRINGEMENT.
++// See the Apache 2 License for the specific language governing permissions and
++// limitations under the License.
++
++
++#ifndef KALDI_NNET_NNET_FSMN_H_
++#define KALDI_NNET_NNET_FSMN_H_
++
++#include "nnet/nnet-component.h"
++#include "nnet/nnet-utils.h"
++#include "cudamatrix/cu-math.h"
++#include "cudamatrix/cu-kernels.h"
++
++
++namespace kaldi {
++namespace nnet1 {
++ class Fsmn : public UpdatableComponent {
++  public:
++   Fsmn(int32 dim_in, int32 dim_out)
++     : UpdatableComponent(dim_in, dim_out),
++     learn_rate_coef_(1.0)
++   {
++   }
++   ~Fsmn()
++   { }
++
++   Component* Copy() const { return new Fsmn(*this); }
++   ComponentType GetType() const { return kFsmn; }
++
++   void SetFlags(const Vector<BaseFloat> &flags) {
++     flags_.Resize(flags.Dim(), kSetZero);
++     flags_.CopyFromVec(flags);
++   }
++   void InitData(std::istream                                                     &is) {
++     // define options
++     float learn_rate_coef = 1.0;
++     int l_order = 1, r_order = 1;
++     int l_stride = 1, r_stride = 1;
++     float range = 0.0;
++     // parse config
++     std::string token;
++     while (is >> std::ws, !is.eof()){
++       ReadToken(is, false, &token);
++       /**/ if (token == "<LearnRateCoef>") ReadBasicType(is, false, &learn_rate_coef);
++       else if (token == "<LOrder>") ReadBasicType(is, false, &l_order);
++       else if (token == "<ROrder>") ReadBasicType(is, false, &r_order);
++       else if (token == "<LStride>") ReadBasicType(is, false, &l_stride);
++       else if (token == "<RStride>") ReadBasicType(is, false, &r_stride);
++       else KALDI_ERR << "Unknown token " << token << ", a typo in config?"
++         << " (LearnRateCoef|LOrder|ROrder|LStride|LStride)";
++     }
++
++     //init
++     learn_rate_coef_ = learn_rate_coef;
++     l_order_ = l_order;
++     r_order_ = r_order;
++     l_stride_ = l_stride;
++     r_stride_ = r_stride;
++     // initialize filter
++     range = sqrt(6)/sqrt(l_order + input_dim_);
++     l_filter_.Resize(l_order, input_dim_, kSetZero);
++     RandUniform(0.0, range, &l_filter_);
++
++     range = sqrt(6)/sqrt(r_order + input_dim_);
++     r_filter_.Resize(r_order, input_dim_, kSetZero);
++     RandUniform(0.0, range, &r_filter_);
++   }
++
++   void ReadData(std::istream &is, bool binary) {
++     // optional learning-rate coefs
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LearnRateCoef>");
++       ReadBasicType(is, binary, &learn_rate_coef_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LOrder>");
++       ReadBasicType(is, binary, &l_order_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<ROrder>");
++       ReadBasicType(is, binary, &r_order_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LStride>");
++       ReadBasicType(is, binary, &l_stride_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<RStride>");
++       ReadBasicType(is, binary, &r_stride_);
++     }        
++     // weights
++     l_filter_.Read(is, binary);
++     r_filter_.Read(is, binary);
++
++     KALDI_ASSERT(l_filter_.NumRows() == l_order_);
++     KALDI_ASSERT(l_filter_.NumCols() == input_dim_);
++
++     KALDI_ASSERT(r_filter_.NumRows() == r_order_);
++     KALDI_ASSERT(r_filter_.NumCols() == input_dim_);
++   }
++
++   void WriteData(std::ostream &os, bool binary) const {
++     WriteToken(os, binary, "<LearnRateCoef>");
++     WriteBasicType(os, binary, learn_rate_coef_);
++     WriteToken(os, binary, "<LOrder>");
++     WriteBasicType(os, binary, l_order_);
++     WriteToken(os, binary, "<ROrder>");
++     WriteBasicType(os, binary, r_order_);
++     WriteToken(os, binary, "<LStride>");
++     WriteBasicType(os, binary, l_stride_);
++     WriteToken(os, binary, "<RStride>");
++     WriteBasicType(os, binary, r_stride_);
++     // weights
++     l_filter_.Write(os, binary);
++     r_filter_.Write(os, binary);
++   }
++
++   void ResetMomentum(void)
++   {
++   }
++
++   int32 NumParams() const { 
++     return l_filter_.NumRows()*l_filter_.NumCols() + r_filter_.NumRows()*r_filter_.NumCols(); 
++   }
++
++   void GetParams(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     int32 r_filter_num_elem = r_filter_.NumRows() * r_filter_.NumCols();
++     wei_copy->Range(0, l_filter_num_elem).CopyRowsFromMat(l_filter_);
++     wei_copy->Range(l_filter_num_elem, r_filter_num_elem).CopyRowsFromMat(r_filter_);
++   }
++
++   void SetParams(const VectorBase<BaseFloat> &wei_copy) {
++     KALDI_ASSERT(wei_copy.Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     int32 r_filter_num_elem = r_filter_.NumRows() * r_filter_.NumCols();
++     l_filter_.CopyRowsFromVec(wei_copy.Range(0, l_filter_num_elem));
++     r_filter_.CopyRowsFromVec(wei_copy.Range(l_filter_num_elem, r_filter_num_elem));
++   }
++
++   void GetGradient(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++   }
++
++   std::string Info() const {
++     return std::string("\n  l_filter") + MomentStatistics(l_filter_) +
++       "\n  r_filter" + MomentStatistics(r_filter_);
++   }
++   std::string InfoGradient() const {
++     return std::string("\n, lr-coef ") + ToString(learn_rate_coef_) +
++       ", l_order " + ToString(l_order_) +
++       ", r_order " + ToString(r_order_) +
++       ", l_stride " + ToString(l_stride_) +
++       ", r_stride " + ToString(r_stride_);
++   }
++
++
++   void PropagateFnc(const CuMatrixBase<BaseFloat> &in, CuMatrixBase<BaseFloat> *out) {
++
++     out->GenMemory(in, l_filter_, r_filter_, flags_, l_order_, r_order_, l_stride_, r_stride_);
++   }
++
++   void BackpropagateFnc(const CuMatrixBase<BaseFloat> &in, const CuMatrixBase<BaseFloat> &out,
++     const CuMatrixBase<BaseFloat> &out_diff, CuMatrixBase<BaseFloat> *in_diff) {
++   
++     const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++
++     in_diff->MemoryErrBack(out_diff, l_filter_, r_filter_, flags_, l_order_, r_order_, l_stride_, r_stride_);
++
++     l_filter_.GetLfilterErr(out_diff, in, flags_, l_order_, l_stride_, lr);
++     r_filter_.GetRfilterErr(out_diff, in, flags_, r_order_, r_stride_, lr);
++
++   }
++
++   void Update(const CuMatrixBase<BaseFloat> &input, const CuMatrixBase<BaseFloat> &diff) {
++     //const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++   }
++
++
++ private:
++   CuMatrix<BaseFloat> l_filter_;
++   CuMatrix<BaseFloat> r_filter_;
++
++   CuVector<BaseFloat> flags_;
++   BaseFloat learn_rate_coef_;
++   int l_order_;
++   int r_order_;
++   int l_stride_;
++   int r_stride_;  
++ };
++
++} // namespace nnet1
++} // namespace kaldi
++
++#endif
+diff --git a/src/nnet/nnet-linear-transform.h b/src/nnet/nnet-linear-transform.h
+index 733ad77..0ff3daa 100644
+--- a/src/nnet/nnet-linear-transform.h
++++ b/src/nnet/nnet-linear-transform.h
+@@ -1,6 +1,7 @@
+ // nnet/nnet-linear-transform.h
+ 
+ // Copyright 2011-2014  Brno University of Technology (author: Karel Vesely)
++//           2018 Alibaba.Inc (Author: ShiLiang Zhang) 
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -47,6 +48,7 @@ class LinearTransform : public UpdatableComponent {
+   void InitData(std::istream &is) {
+     // define options
+     float param_stddev = 0.1;
++    int xavier_flag = 0;
+     std::string read_matrix_file;
+     // parse config
+     std::string token;
+@@ -55,8 +57,9 @@ class LinearTransform : public UpdatableComponent {
+       /**/ if (token == "<ParamStddev>") ReadBasicType(is, false, &param_stddev);
+       else if (token == "<ReadMatrix>") ReadToken(is, false, &read_matrix_file);
+       else if (token == "<LearnRateCoef>") ReadBasicType(is, false, &learn_rate_coef_);
++      else if (token == "<Xavier>") ReadBasicType(is, false, &xavier_flag);
+       else KALDI_ERR << "Unknown token " << token << ", a typo in config?"
+-                     << " (ParamStddev|ReadMatrix|LearnRateCoef)";
++                     << " (ParamStddev|ReadMatrix|LearnRateCoef|Xavier_flag)";
+     }
+ 
+     if (read_matrix_file != "") {  // load from file,
+@@ -80,10 +83,17 @@ class LinearTransform : public UpdatableComponent {
+ 
+     //
+     // Initialize trainable parameters,
+-    //
+-    // Gaussian with given std_dev (mean = 0),
+-    linearity_.Resize(OutputDim(), InputDim());
+-    RandGauss(0.0, param_stddev, &linearity_);
++    //  if Xavier_flag=1, use the “Xavier” initialization
++    if(xavier_flag){
++      float range = sqrt(6)/sqrt(OutputDim() + InputDim());
++      linearity_.Resize(OutputDim(), InputDim(), kSetZero);
++      RandUniform(0.0, range, &linearity_); 
++    }
++    else{
++      // Gaussian with given std_dev (mean = 0),
++      linearity_.Resize(OutputDim(), InputDim());
++      RandGauss(0.0, param_stddev, &linearity_);
++    }
+   }
+ 
+   void ReadData(std::istream &is, bool binary) {
+diff --git a/src/nnet/nnet-nnet.cc b/src/nnet/nnet-nnet.cc
+index 86c5f9e..c2cde71 100644
+--- a/src/nnet/nnet-nnet.cc
++++ b/src/nnet/nnet-nnet.cc
+@@ -1,6 +1,7 @@
+ // nnet/nnet-nnet.cc
+ 
+ // Copyright 2011-2016  Brno University of Technology (Author: Karel Vesely)
++//           2018 Alibaba.Inc (Author: ShiLiang Zhang)  
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -24,6 +25,10 @@
+ #include "nnet/nnet-activation.h"
+ #include "nnet/nnet-affine-transform.h"
+ #include "nnet/nnet-various.h"
++#include "nnet/nnet-fsmn.h"
++#include "nnet/nnet-deep-fsmn.h"
++#include "nnet/nnet-uni-fsmn.h"
++#include "nnet/nnet-uni-deep-fsmn.h"
+ 
+ namespace kaldi {
+ namespace nnet1 {
+@@ -515,6 +520,26 @@ void Nnet::SetTrainOptions(const NnetTrainOptions& opts) {
+   }
+ }
+ 
++void Nnet::SetFlags(const Vector<BaseFloat> &flags) {    
++  for (int32 c = 0; c < NumComponents(); c++) {
++    if (GetComponent(c).GetType() == Component::kFsmn) {
++      Fsmn& comp = dynamic_cast<Fsmn&>(GetComponent(c));
++      comp.SetFlags(flags);
++    }
++    if (GetComponent(c).GetType() == Component::kDeepFsmn) {
++      DeepFsmn& comp = dynamic_cast<DeepFsmn&>(GetComponent(c));
++      comp.SetFlags(flags);
++    }
++    if (GetComponent(c).GetType() == Component::kUniFsmn) {
++      UniFsmn& comp = dynamic_cast<UniFsmn&>(GetComponent(c));
++      comp.SetFlags(flags);
++    }
++    if (GetComponent(c).GetType() == Component::kUniDeepFsmn) {
++      UniDeepFsmn& comp = dynamic_cast<UniDeepFsmn&>(GetComponent(c));
++      comp.SetFlags(flags);
++    }
++  }
++}
+ 
+ }  // namespace nnet1
+ }  // namespace kaldi
+diff --git a/src/nnet/nnet-nnet.h b/src/nnet/nnet-nnet.h
+index cf29f91..865e09c 100644
+--- a/src/nnet/nnet-nnet.h
++++ b/src/nnet/nnet-nnet.h
+@@ -1,6 +1,7 @@
+ // nnet/nnet-nnet.h
+ 
+ // Copyright 2011-2016  Brno University of Technology (Author: Karel Vesely)
++//           2018 Alibaba.Inc (Author: ShiLiang Zhang) 
+ 
+ // See ../../COPYING for clarification regarding multiple authors
+ //
+@@ -164,6 +165,9 @@ class Nnet {
+     return opts_;
+   }
+ 
++  /// For FSMN component
++  void SetFlags(const Vector<BaseFloat> &flags);
++
+  private:
+   /// Vector which contains all the components composing the neural network,
+   /// the components are for example: AffineTransform, Sigmoid, Softmax
+diff --git a/src/nnet/nnet-uni-deep-fsmn.h b/src/nnet/nnet-uni-deep-fsmn.h
+new file mode 100644
+index 0000000..282cc2a
+--- /dev/null
++++ b/src/nnet/nnet-uni-deep-fsmn.h
+@@ -0,0 +1,319 @@
++// nnet/nnet-deep-fsmn.h
++
++// Copyright 2018 Alibaba.Inc (Author: Shiliang Zhang) 
++
++// See ../../COPYING for clarification regarding multiple authors
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//  http://www.apache.org/licenses/LICENSE-2.0
++//
++// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
++// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
++// MERCHANTABLITY OR NON-INFRINGEMENT.
++// See the Apache 2 License for the specific language governing permissions and
++// limitations under the License.
++
++
++#ifndef KALDI_NNET_NNET_UNI_DEEP_FSMN_H_
++#define KALDI_NNET_NNET_UNI_DEEP_FSMN_H_
++
++
++#include "nnet/nnet-component.h"
++#include "nnet/nnet-utils.h"
++#include "cudamatrix/cu-math.h"
++#include "cudamatrix/cu-kernels.h"
++
++
++namespace kaldi {
++namespace nnet1 {
++ class UniDeepFsmn : public UpdatableComponent {
++  public:
++   UniDeepFsmn(int32 dim_in, int32 dim_out)
++     : UpdatableComponent(dim_in, dim_out),
++     learn_rate_coef_(1.0)
++   {
++   }
++   ~UniDeepFsmn()
++   { }
++
++   Component* Copy() const { return new UniDeepFsmn(*this); }
++   ComponentType GetType() const { return kUniDeepFsmn; }
++
++   void SetFlags(const Vector<BaseFloat> &flags) {
++     flags_.Resize(flags.Dim(), kSetZero);
++     flags_.CopyFromVec(flags);
++   }
++
++   void InitData(std::istream                                                     &is) {
++     // define options
++     float learn_rate_coef = 1.0;
++     int hid_size;
++     int l_order = 1;
++     int l_stride = 1;
++     float range = 0.0;
++     // parse config
++     std::string token;
++     while (is >> std::ws, !is.eof()) {
++       ReadToken(is, false, &token);
++       /**/ if (token == "<LearnRateCoef>") ReadBasicType(is, false, &learn_rate_coef);
++       else if (token == "<HidSize>") ReadBasicType(is, false, &hid_size);
++       else if (token == "<LOrder>") ReadBasicType(is, false, &l_order);
++       else if (token == "<LStride>") ReadBasicType(is, false, &l_stride);
++       else KALDI_ERR << "Unknown token " << token << ", a typo in config?"
++         << " (LearnRateCoef|HidSize|LOrder|LStride)";
++     }
++     //parameters
++     learn_rate_coef_ = learn_rate_coef;
++     l_order_ = l_order;
++     l_stride_ = l_stride;
++     hid_size_ = hid_size;
++     // initialize 
++     range = sqrt(6)/sqrt(l_order_ + output_dim_);
++     l_filter_.Resize(l_order_, output_dim_, kSetZero);
++     RandUniform(0.0, range, &l_filter_);
++
++     //linear transform
++     range = sqrt(6)/sqrt(hid_size_ + output_dim_);
++     p_weight_.Resize(output_dim_, hid_size_, kSetZero);
++     RandUniform(0.0, range, &p_weight_);
++
++     ///affine transform + nonlinear activation
++     range = sqrt(6)/sqrt(hid_size_ + input_dim_);
++     linearity_.Resize(hid_size_, input_dim_, kSetZero);
++     RandUniform(0.0, range, &linearity_);
++     
++     bias_.Resize(hid_size_,kSetZero);
++
++     //gradient related
++     p_weight_corr_.Resize(output_dim_, hid_size_, kSetZero);
++     linearity_corr_.Resize(hid_size_, input_dim_, kSetZero);
++     bias_corr_.Resize(hid_size_, kSetZero);
++   }
++
++   void ReadData(std::istream &is, bool binary) {
++     // optional learning-rate coefs
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LearnRateCoef>");
++       ReadBasicType(is, binary, &learn_rate_coef_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<HidSize>");
++       ReadBasicType(is, binary, &hid_size_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LOrder>");
++       ReadBasicType(is, binary, &l_order_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LStride>");
++       ReadBasicType(is, binary, &l_stride_);
++     }      
++     // weights
++     l_filter_.Read(is, binary);
++     p_weight_.Read(is, binary);
++     linearity_.Read(is, binary);
++     bias_.Read(is, binary);
++
++     KALDI_ASSERT(l_filter_.NumRows() == l_order_);
++     KALDI_ASSERT(l_filter_.NumCols() == input_dim_);
++
++     KALDI_ASSERT(p_weight_.NumRows() == output_dim_);
++     KALDI_ASSERT(p_weight_.NumCols() == hid_size_);
++
++     KALDI_ASSERT(linearity_.NumRows() == hid_size_);
++     KALDI_ASSERT(linearity_.NumCols() == input_dim_);
++
++     KALDI_ASSERT(bias_.Dim() == hid_size_);
++
++     //gradient related
++     p_weight_corr_.Resize(output_dim_, hid_size_, kSetZero);
++     linearity_corr_.Resize(hid_size_, input_dim_, kSetZero);
++     bias_corr_.Resize(hid_size_, kSetZero);
++   }
++
++   void WriteData(std::ostream &os, bool binary) const {
++     WriteToken(os, binary, "<LearnRateCoef>");
++     WriteBasicType(os, binary, learn_rate_coef_);
++     WriteToken(os, binary, "<HidSize>");
++     WriteBasicType(os, binary, hid_size_);
++     WriteToken(os, binary, "<LOrder>");
++     WriteBasicType(os, binary, l_order_);
++     WriteToken(os, binary, "<LStride>");
++     WriteBasicType(os, binary, l_stride_);
++     // weights
++     l_filter_.Write(os, binary);
++     p_weight_.Write(os, binary);
++     linearity_.Write(os, binary);
++     bias_.Write(os, binary);
++
++   }
++
++   void ResetMomentum(void)
++   {
++     p_weight_corr_.Set(0.0);
++     linearity_corr_.Set(0.0);
++     bias_corr_.Set(0.0);
++   }
++
++   int32 NumParams() const { 
++     return l_filter_.NumRows()*l_filter_.NumCols() + p_weight_.NumRows()*p_weight_.NumCols() 
++       + linearity_.NumRows()*linearity_.NumCols() + bias_.Dim();
++   }
++
++   void GetParams(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     int32 p_weight_num_elem = p_weight_.NumRows()*p_weight_.NumCols();
++     int32 linearity_num_elem = linearity_.NumRows()*linearity_.NumCols();
++     int32 offset=0;
++     wei_copy->Range(offset, l_filter_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(l_filter_));
++     offset += l_filter_num_elem;
++     wei_copy->Range(offset, p_weight_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(p_weight_));
++     offset += p_weight_num_elem;
++     wei_copy->Range(offset, linearity_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(linearity_));
++     offset += linearity_num_elem;
++     wei_copy->Range(offset, bias_.Dim()).CopyFromVec(Vector<BaseFloat>(bias_));
++   }
++
++   void SetParams(const VectorBase<BaseFloat> &wei_copy) {
++     KALDI_ASSERT(wei_copy.Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     int32 p_weight_num_elem = p_weight_.NumRows()*p_weight_.NumCols();
++     int32 linearity_num_elem = linearity_.NumRows()*linearity_.NumCols();
++     int32 offset = 0;
++     l_filter_.CopyRowsFromVec(wei_copy.Range(offset, l_filter_num_elem));
++     offset += l_filter_num_elem;
++     p_weight_.CopyRowsFromVec(wei_copy.Range(offset, p_weight_num_elem));
++     offset += p_weight_num_elem;
++     linearity_.CopyRowsFromVec(wei_copy.Range(offset, linearity_num_elem));
++     offset += linearity_num_elem;
++     bias_.CopyFromVec(wei_copy.Range(offset, bias_.Dim()));
++   }
++
++   void GetGradient(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++     int32 p_weight_num_elem = p_weight_corr_.NumRows()*p_weight_corr_.NumCols();
++     int32 linearity_num_elem = linearity_corr_.NumRows()*linearity_corr_.NumCols();
++     int32 offset = 0;
++     wei_copy->Range(offset, p_weight_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(p_weight_corr_));
++     offset += p_weight_num_elem;
++     wei_copy->Range(offset, linearity_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(linearity_corr_));
++     offset += linearity_num_elem;
++     wei_copy->Range(offset, bias_.Dim()).CopyFromVec(Vector<BaseFloat>(bias_corr_));
++   }
++
++   std::string Info() const {
++     return std::string("\n  l_filter") + MomentStatistics(l_filter_) +
++       "\n  p_weight" + MomentStatistics(p_weight_) +
++       "\n  linearity" + MomentStatistics(linearity_) +
++       "\n  bias" + MomentStatistics(bias_);
++   }
++   std::string InfoGradient() const {
++     return std::string("\n, lr-coef ") + ToString(learn_rate_coef_) +
++       ", hid_size" + ToString(hid_size_) +
++       ", l_order " + ToString(l_order_) +
++       ", l_stride " + ToString(l_stride_);
++   }
++
++
++   void PropagateFnc(const CuMatrixBase<BaseFloat> &in, CuMatrixBase<BaseFloat> *out) {
++
++     int nframes = in.NumRows();
++     //////////////////////////////////////
++     //step1. nonlinear affine transform
++     hid_out_.Resize(nframes, hid_size_, kSetZero);
++     // pre copy bias
++     hid_out_.AddVecToRows(1.0, bias_, 0.0);
++     // multiply by weights^t
++     hid_out_.AddMatMat(1.0, in, kNoTrans, linearity_, kTrans, 1.0);
++     // Relu nonlinear activation function
++     hid_out_.ApplyFloor(0.0);
++
++     ////Step2. linear affine transform
++     p_out_.Resize(nframes, output_dim_, kSetZero);
++     p_out_.AddMatMat(1.0, hid_out_, kNoTrans, p_weight_, kTrans, 0.0);
++
++     ////Step3. fsmn layer
++     out->GenUniMemory(p_out_, l_filter_, flags_, l_order_, l_stride_);
++
++     ///step4. skip connection
++     out->AddMat(1.0, in, kNoTrans);
++   }
++
++   void BackpropagateFnc(const CuMatrixBase<BaseFloat> &in, const CuMatrixBase<BaseFloat> &out,
++     const CuMatrixBase<BaseFloat> &out_diff, CuMatrixBase<BaseFloat> *in_diff) {
++     
++     int nframes = in.NumRows();
++     const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++     const BaseFloat mmt = opts_.momentum;
++     //Step 1. fsmn layer
++     p_out_err_.Resize(nframes, output_dim_, kSetZero);
++     p_out_err_.UniMemoryErrBack(out_diff, l_filter_, flags_, l_order_,  l_stride_);
++     //l_filter_corr_.Set(0.0);
++     l_filter_.GetLfilterErr(out_diff, p_out_, flags_, l_order_, l_stride_, lr);
++     
++     //Step 2. linear affine transform
++     // multiply error derivative by weights
++     hid_out_err_.Resize(nframes, hid_size_, kSetZero);
++     hid_out_err_.AddMatMat(1.0, p_out_err_, kNoTrans, p_weight_, kNoTrans, 0.0);
++     p_weight_corr_.AddMatMat(1.0, p_out_err_, kTrans, hid_out_, kNoTrans, mmt);
++
++     //Step3. nonlinear affine transform
++     hid_out_.ApplyHeaviside();
++     hid_out_err_.MulElements(hid_out_);
++
++     in_diff->AddMatMat(1.0, hid_out_err_, kNoTrans, linearity_, kNoTrans, 0.0);
++     linearity_corr_.AddMatMat(1.0, hid_out_err_, kTrans, in, kNoTrans, mmt);
++     bias_corr_.AddRowSumMat(1.0, hid_out_err_, mmt);
++
++     //Step4. skip connection
++     in_diff->AddMat(1.0, out_diff, kNoTrans);
++   }
++
++   void Update(const CuMatrixBase<BaseFloat> &input, const CuMatrixBase<BaseFloat> &diff) {
++     
++     const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++     const BaseFloat l2 = opts_.l2_penalty;
++
++     if (l2 != 0.0) {
++       linearity_.AddMat(-lr*l2, linearity_);
++       p_weight_.AddMat(-lr*l2,  p_weight_);
++     }
++     p_weight_.AddMat(-lr, p_weight_corr_);
++     linearity_.AddMat(-lr, linearity_corr_);
++     bias_.AddVec(-lr, bias_corr_);
++   }
++
++ private:
++   ///fsmn layer
++   CuMatrix<BaseFloat> l_filter_;
++   CuVector<BaseFloat> flags_;
++
++   //linear affine transform
++   CuMatrix<BaseFloat> p_out_;
++   CuMatrix<BaseFloat> p_out_err_;
++   CuMatrix<BaseFloat> p_weight_;
++   CuMatrix<BaseFloat> p_weight_corr_;
++
++   ///affine transform + nonlinear activation
++   CuMatrix<BaseFloat> hid_out_;
++   CuMatrix<BaseFloat> hid_out_err_;
++   CuMatrix<BaseFloat> linearity_;
++   CuVector<BaseFloat> bias_;
++   CuMatrix<BaseFloat> linearity_corr_;
++   CuVector<BaseFloat> bias_corr_;
++
++   BaseFloat learn_rate_coef_;
++   int l_order_;
++   int l_stride_;
++   int hid_size_;
++ };
++
++} // namespace nnet1
++} // namespace kaldi
++
++#endif
+diff --git a/src/nnet/nnet-uni-fsmn.h b/src/nnet/nnet-uni-fsmn.h
+new file mode 100644
+index 0000000..f723a41
+--- /dev/null
++++ b/src/nnet/nnet-uni-fsmn.h
+@@ -0,0 +1,175 @@
++// nnet/nnet-uni-fsmn.h
++
++// Copyright 2018 Alibaba.Inc (Author: Shiliang Zhang) 
++
++// See ../../COPYING for clarification regarding multiple authors
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//  http://www.apache.org/licenses/LICENSE-2.0
++//
++// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
++// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
++// MERCHANTABLITY OR NON-INFRINGEMENT.
++// See the Apache 2 License for the specific language governing permissions and
++// limitations under the License.
++
++
++#ifndef KALDI_NNET_NNET_UNI_FSMN_H_
++#define KALDI_NNET_NNET_UNI_FSMN_H_
++
++
++#include "nnet/nnet-component.h"
++#include "nnet/nnet-utils.h"
++#include "cudamatrix/cu-math.h"
++#include "cudamatrix/cu-kernels.h"
++
++
++namespace kaldi {
++namespace nnet1 {
++ class UniFsmn : public UpdatableComponent {
++  public:
++   UniFsmn(int32 dim_in, int32 dim_out)
++     : UpdatableComponent(dim_in, dim_out),
++     learn_rate_coef_(1.0)
++   {
++   }
++   ~UniFsmn()
++   { }
++
++   Component* Copy() const { return new UniFsmn(*this); }
++   ComponentType GetType() const { return kUniFsmn; }
++
++   void SetFlags(const Vector<BaseFloat> &flags) {
++     flags_.Resize(flags.Dim(), kSetZero);
++     flags_.CopyFromVec(flags);
++   }
++   void InitData(std::istream                                                     &is) {
++     // define options
++     float learn_rate_coef = 1.0;
++     int l_order = 1;
++     int l_stride = 1;
++     float range = 0.0;
++     // parse config
++     std::string token;
++     while (is >> std::ws, !is.eof()) {
++       ReadToken(is, false, &token);
++       /**/ if (token == "<LearnRateCoef>") ReadBasicType(is, false, &learn_rate_coef);
++       else if (token == "<LOrder>") ReadBasicType(is, false, &l_order);
++       else if (token == "<LStride>") ReadBasicType(is, false, &l_stride);
++       else KALDI_ERR << "Unknown token " << token << ", a typo in config?"
++         << " (LearnRateCoef|LOrder|LStride)";
++     }
++
++     //init
++     learn_rate_coef_ = learn_rate_coef;
++     l_order_ = l_order;
++     l_stride_ = l_stride;
++
++     // initialize filter
++     range = sqrt(6)/sqrt(l_order + input_dim_);
++     l_filter_.Resize(l_order, input_dim_, kSetZero);
++     RandUniform(0.0, range, &l_filter_);
++   }
++
++   void ReadData(std::istream &is, bool binary) {
++     // optional learning-rate coefs
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LearnRateCoef>");
++       ReadBasicType(is, binary, &learn_rate_coef_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LOrder>");
++       ReadBasicType(is, binary, &l_order_);
++     }
++     if ('<' == Peek(is, binary)) {
++       ExpectToken(is, binary, "<LStride>");
++       ReadBasicType(is, binary, &l_stride_);
++     }      
++     // weights
++     l_filter_.Read(is, binary);
++     KALDI_ASSERT(l_filter_.NumRows() == l_order_);
++     KALDI_ASSERT(l_filter_.NumCols() == input_dim_);
++
++   }
++
++   void WriteData(std::ostream &os, bool binary) const {
++     WriteToken(os, binary, "<LearnRateCoef>");
++     WriteBasicType(os, binary, learn_rate_coef_);
++     WriteToken(os, binary, "<LOrder>");
++     WriteBasicType(os, binary, l_order_);
++     WriteToken(os, binary, "<LStride>");
++     WriteBasicType(os, binary, l_stride_);
++     // weights
++     l_filter_.Write(os, binary);
++   }
++
++   void ResetMomentum(void)
++   {
++   }
++
++   int32 NumParams() const { 
++     return l_filter_.NumRows()*l_filter_.NumCols(); 
++   }
++
++   void GetParams(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     wei_copy->Range(0, l_filter_num_elem).CopyRowsFromMat(Matrix<BaseFloat>(l_filter_));
++   }
++
++   void SetParams(const VectorBase<BaseFloat> &wei_copy) {
++     KALDI_ASSERT(wei_copy.Dim() == NumParams());
++     int32 l_filter_num_elem = l_filter_.NumRows() * l_filter_.NumCols();
++     l_filter_.CopyRowsFromVec(wei_copy.Range(0, l_filter_num_elem));
++   }
++
++   void GetGradient(VectorBase<BaseFloat>* wei_copy) const {
++     KALDI_ASSERT(wei_copy->Dim() == NumParams());
++   }
++
++   std::string Info() const {
++     return std::string("\n  l_filter") + MomentStatistics(l_filter_);
++   }
++   std::string InfoGradient() const {
++     return std::string("\n, lr-coef ") + ToString(learn_rate_coef_) +
++       ", l_order " + ToString(l_order_) +
++       ", l_stride " + ToString(l_stride_);
++   }
++
++   void PropagateFnc(const CuMatrixBase<BaseFloat> &in, CuMatrixBase<BaseFloat> *out) {
++
++     out->GenUniMemory(in, l_filter_, flags_, l_order_, l_stride_);
++   }
++
++   void BackpropagateFnc(const CuMatrixBase<BaseFloat> &in, const CuMatrixBase<BaseFloat> &out,
++     const CuMatrixBase<BaseFloat> &out_diff, CuMatrixBase<BaseFloat> *in_diff) {
++   
++     const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++
++     in_diff->UniMemoryErrBack(out_diff, l_filter_,  flags_, l_order_, l_stride_);
++
++     l_filter_.GetLfilterErr(out_diff, in, flags_, l_order_, l_stride_, lr);
++   }
++
++   void Update(const CuMatrixBase<BaseFloat> &input, const CuMatrixBase<BaseFloat> &diff) {
++     ///const BaseFloat lr = opts_.learn_rate * learn_rate_coef_;
++   }
++
++
++ private:
++   CuMatrix<BaseFloat> l_filter_;
++   CuVector<BaseFloat> flags_;
++
++   BaseFloat learn_rate_coef_;
++   int l_order_;
++   int l_stride_;
++ };
++
++} // namespace nnet1
++} // namespace kaldi
++
++#endif
+-- 
+1.8.3.1
+
