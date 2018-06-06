@@ -4,7 +4,7 @@ This is a PATCH file with the DFSMN related codes and example scripts for LibriS
 
 # Apply Patch
 
-The patch is built based on the Kaldi speech recognition toolkit with commit "04b1f7d6658bc035df93d53cb424edc127fab819". 
+The patch is built based on [the Kaldi speech recognition toolkit](https://github.com/kaldi-asr/kaldi) with commit "04b1f7d6658bc035df93d53cb424edc127fab819". 
 
 You can apply this patch to your own kaldi branch by using the following commands:
 
