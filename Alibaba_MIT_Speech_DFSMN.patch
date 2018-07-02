@@ -1,43 +1,189 @@
-From beb50ec01b054bd3b5ea054c74bd6a918dc386a8 Mon Sep 17 00:00:00 2001
+From 02cce315a6b6cb7f45dd92673e9203d7c3d1b242 Mon Sep 17 00:00:00 2001
 From: "sly.zsl" <sly.zsl@alibaba-inc.com>
-Date: Mon, 4 Jun 2018 19:52:11 +0800
-Subject: [PATCH] add DFSMN related codes and example scripts
+Date: Mon, 2 Jul 2018 19:10:46 +0800
+Subject: [PATCH] add DFSMN related codes
 
 ---
+ egs/librispeech/s5/RESULTS                        | 114 +++++
+ egs/librispeech/s5/conf/fbank.conf                |   6 +
  egs/librispeech/s5/local/nnet/DFSMN_L.proto       |  23 ++
- egs/librispeech/s5/local/nnet/DFSMN_M.proto       |  19 ++
- egs/librispeech/s5/local/nnet/DFSMN_S.proto       |  19 ++
- egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh | 144 +++++++++
- src/cudamatrix/cu-device.cc                       |  17 ++
- src/cudamatrix/cu-device.h                        |   2 +
+ egs/librispeech/s5/local/nnet/DFSMN_M.proto       |  19 +
+ egs/librispeech/s5/local/nnet/DFSMN_S.proto       |  19 +
+ egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh | 142 +++++++
+ egs/librispeech/s5/run.sh                         |  12 +-
+ egs/wsj/s5/steps/nnet/train_faster.sh             | 481 ++++++++++++++++++++++
+ egs/wsj/s5/steps/nnet/train_faster_scheduler.sh   | 221 ++++++++++
  src/cudamatrix/cu-kernels-ansi.h                  |  32 ++
- src/cudamatrix/cu-kernels.cu                      | 335 +++++++++++++++++++++
- src/cudamatrix/cu-kernels.h                       |  75 +++++
- src/cudamatrix/cu-matrix.cc                       | 209 ++++++++++++-
+ src/cudamatrix/cu-kernels.cu                      | 335 +++++++++++++++
+ src/cudamatrix/cu-kernels.h                       |  75 ++++
+ src/cudamatrix/cu-matrix.cc                       | 209 +++++++++-
  src/cudamatrix/cu-matrix.h                        |  33 +-
  src/featbin/Makefile                              |   2 +-
- src/featbin/append-ivector-to-feats.cc            | 231 ++++++++++++++
+ src/featbin/append-ivector-to-feats.cc            | 231 +++++++++++
  src/nnet/nnet-affine-transform.h                  |  28 +-
- src/nnet/nnet-component.cc                        |  22 ++
+ src/nnet/nnet-component.cc                        |  22 +
  src/nnet/nnet-component.h                         |   9 +-
- src/nnet/nnet-deep-fsmn.h                         | 350 ++++++++++++++++++++++
- src/nnet/nnet-fsmn.h                              | 211 +++++++++++++
+ src/nnet/nnet-deep-fsmn.h                         | 350 ++++++++++++++++
+ src/nnet/nnet-fsmn.h                              | 211 ++++++++++
  src/nnet/nnet-linear-transform.h                  |  20 +-
  src/nnet/nnet-nnet.cc                             |  25 ++
  src/nnet/nnet-nnet.h                              |   4 +
- src/nnet/nnet-uni-deep-fsmn.h                     | 319 ++++++++++++++++++++
- src/nnet/nnet-uni-fsmn.h                          | 175 +++++++++++
- 23 files changed, 2282 insertions(+), 22 deletions(-)
+ src/nnet/nnet-uni-deep-fsmn.h                     | 319 ++++++++++++++
+ src/nnet/nnet-uni-fsmn.h                          | 175 ++++++++
+ src/nnetbin/Makefile                              |   3 +-
+ src/nnetbin/nnet-forward.cc                       |   6 +
+ src/nnetbin/nnet-train-fsmn-streams.cc            | 420 +++++++++++++++++++
+ src/nnetbin/nnet-train-mmi-sequential.cc          |   6 +
+ src/nnetbin/nnet-train-mpe-sequential.cc          |   6 +
+ 31 files changed, 3534 insertions(+), 24 deletions(-)
+ create mode 100644 egs/librispeech/s5/conf/fbank.conf
  create mode 100644 egs/librispeech/s5/local/nnet/DFSMN_L.proto
  create mode 100644 egs/librispeech/s5/local/nnet/DFSMN_M.proto
  create mode 100644 egs/librispeech/s5/local/nnet/DFSMN_S.proto
  create mode 100644 egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh
+ create mode 100755 egs/wsj/s5/steps/nnet/train_faster.sh
+ create mode 100755 egs/wsj/s5/steps/nnet/train_faster_scheduler.sh
  create mode 100644 src/featbin/append-ivector-to-feats.cc
  create mode 100644 src/nnet/nnet-deep-fsmn.h
  create mode 100644 src/nnet/nnet-fsmn.h
  create mode 100644 src/nnet/nnet-uni-deep-fsmn.h
  create mode 100644 src/nnet/nnet-uni-fsmn.h
+ create mode 100644 src/nnetbin/nnet-train-fsmn-streams.cc
 
+diff --git a/egs/librispeech/s5/RESULTS b/egs/librispeech/s5/RESULTS
+index 32b39b2..f06421f 100644
+--- a/egs/librispeech/s5/RESULTS
++++ b/egs/librispeech/s5/RESULTS
+@@ -681,3 +681,117 @@
+ %WER 14.64 [ 7664 / 52343, 818 ins, 956 del, 5890 sub ] exp/chain/tdnn_6z_sp_smbr/decode_test_other_tgsmall_epoch3/wer_13_0.0
+ %WER 14.70 [ 7696 / 52343, 835 ins, 945 del, 5916 sub ] exp/chain/tdnn_6z_sp_smbr/decode_test_other_tgsmall_epoch6/wer_13_0.0
+ %WER 14.75 [ 7722 / 52343, 892 ins, 849 del, 5981 sub ] exp/chain/tdnn_6z_sp_smbr/decode_test_other_tgsmall_epoch9/wer_12_0.0
++
++# Results with nnet DFMSN_S + CE
++# local/nnet/run_fsmn_ivector.sh DFSMN_S
++# Training on the "cleaned" data
++%WER 3.97 [ 2160 / 54402, 264 ins, 233 del, 1663 sub ] exp/tri7b_DFSMN_S/decode_fglarge_dev_clean/wer_10_1.0
++%WER 4.10 [ 2230 / 54402, 270 ins, 242 del, 1718 sub ] exp/tri7b_DFSMN_S/decode_tglarge_dev_clean/wer_12_0.5
++%WER 5.06 [ 2752 / 54402, 274 ins, 360 del, 2118 sub ] exp/tri7b_DFSMN_S/decode_tgmed_dev_clean/wer_13_0.5
++%WER 5.55 [ 3022 / 54402, 335 ins, 347 del, 2340 sub ] exp/tri7b_DFSMN_S/decode_tgsmall_dev_clean/wer_11_0.0
++
++%WER 4.61 [ 2423 / 52576, 313 ins, 288 del, 1822 sub ] exp/tri7b_DFSMN_S/decode_fglarge_test_clean/wer_12_1.0
++%WER 4.69 [ 2468 / 52576, 325 ins, 282 del, 1861 sub ] exp/tri7b_DFSMN_S/decode_tglarge_test_clean/wer_13_0.5
++%WER 5.69 [ 2992 / 52576, 370 ins, 344 del, 2278 sub ] exp/tri7b_DFSMN_S/decode_tgmed_test_clean/wer_11_0.5
++%WER 6.28 [ 3301 / 52576, 366 ins, 428 del, 2507 sub ] exp/tri7b_DFSMN_S/decode_tgsmall_test_clean/wer_12_0.5
++
++%WER 11.71 [ 5968 / 50948, 719 ins, 704 del, 4545 sub ] exp/tri7b_DFSMN_S/decode_fglarge_dev_other/wer_15_0.0
++%WER 12.19 [ 6209 / 50948, 700 ins, 866 del, 4643 sub ] exp/tri7b_DFSMN_S/decode_tglarge_dev_other/wer_17_0.0
++%WER 14.25 [ 7260 / 50948, 755 ins, 1011 del, 5494 sub ] exp/tri7b_DFSMN_S/decode_tgmed_dev_other/wer_15_0.0
++%WER 15.35 [ 7823 / 50948, 741 ins, 1165 del, 5917 sub ] exp/tri7b_DFSMN_S/decode_tgsmall_dev_other/wer_15_0.0
++
++%WER 12.01 [ 6289 / 52343, 649 ins, 930 del, 4710 sub ] exp/tri7b_DFSMN_S/decode_fglarge_test_other/wer_16_0.0
++%WER 12.45 [ 6519 / 52343, 688 ins, 929 del, 4902 sub ] exp/tri7b_DFSMN_S/decode_tglarge_test_other/wer_15_0.0
++%WER 14.56 [ 7622 / 52343, 715 ins, 1191 del, 5716 sub ] exp/tri7b_DFSMN_S/decode_tgmed_test_other/wer_15_0.0
++%WER 15.68 [ 8208 / 52343, 743 ins, 1321 del, 6144 sub ] exp/tri7b_DFSMN_S/decode_tgsmall_test_other/wer_15_0.0
++
++# Results with nnet DFMSN_S + CE + SMBR
++# local/nnet/run_fsmn_ivector.sh DFSMN_S
++# Training on the "cleaned" data
++%WER 3.77 [ 2053 / 54402, 233 ins, 274 del, 1546 sub ] exp/tri7b_DFSMN_S_smbr/decode_fglarge_dev_clean/wer_27_0.5
++%WER 3.86 [ 2102 / 54402, 231 ins, 264 del, 1607 sub ] exp/tri7b_DFSMN_S_smbr/decode_tglarge_dev_clean/wer_26_0.5
++%WER 4.77 [ 2597 / 54402, 230 ins, 366 del, 2001 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgmed_dev_clean/wer_29_0.5
++%WER 5.21 [ 2836 / 54402, 290 ins, 329 del, 2217 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgsmall_dev_clean/wer_26_0.0
++
++%WER 4.26 [ 2239 / 52576, 250 ins, 313 del, 1676 sub ] exp/tri7b_DFSMN_S_smbr/decode_fglarge_test_clean/wer_27_1.0
++%WER 4.34 [ 2282 / 52576, 265 ins, 306 del, 1711 sub ] exp/tri7b_DFSMN_S_smbr/decode_tglarge_test_clean/wer_29_0.5
++%WER 5.22 [ 2746 / 52576, 319 ins, 315 del, 2112 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgmed_test_clean/wer_28_0.0
++%WER 5.81 [ 3055 / 52576, 357 ins, 329 del, 2369 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgsmall_test_clean/wer_25_0.0
++
++%WER 11.77 [ 5996 / 50948, 734 ins, 767 del, 4495 sub ] exp/tri7b_DFSMN_S_smbr/decode_fglarge_dev_other/wer_30_0.0
++%WER 12.09 [ 6158 / 50948, 644 ins, 926 del, 4588 sub ] exp/tri7b_DFSMN_S_smbr/decode_tglarge_dev_other/wer_30_0.5
++%WER 13.92 [ 7090 / 50948, 763 ins, 1018 del, 5309 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgmed_dev_other/wer_30_0.0
++%WER 14.85 [ 7564 / 50948, 749 ins, 1108 del, 5707 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgsmall_dev_other/wer_30_0.0
++
++%WER 11.65 [ 6099 / 52343, 595 ins, 1001 del, 4503 sub ] exp/tri7b_DFSMN_S_smbr/decode_fglarge_test_other/wer_30_0.5
++%WER 12.09 [ 6329 / 52343, 686 ins, 907 del, 4736 sub ] exp/tri7b_DFSMN_S_smbr/decode_tglarge_test_other/wer_30_0.0
++%WER 14.17 [ 7418 / 52343, 729 ins, 1115 del, 5574 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgmed_test_other/wer_30_0.0
++%WER 15.16 [ 7933 / 52343, 759 ins, 1228 del, 5946 sub ] exp/tri7b_DFSMN_S_smbr/decode_tgsmall_test_other/wer_30_0.0
++
++# Results with nnet DFMSN_M + CE
++# local/nnet/run_fsmn_ivector.sh DFSMN_M
++# Training on the "cleaned" data
++%WER 4.04 [ 2200 / 54402, 254 ins, 255 del, 1691 sub ] exp/tri7b_DFSMN_M/decode_fglarge_dev_clean/wer_12_1.0
++%WER 4.15 [ 2257 / 54402, 266 ins, 247 del, 1744 sub ] exp/tri7b_DFSMN_M/decode_tglarge_dev_clean/wer_13_0.5
++%WER 5.01 [ 2727 / 54402, 304 ins, 308 del, 2115 sub ] exp/tri7b_DFSMN_M/decode_tgmed_dev_clean/wer_12_0.5
++%WER 5.54 [ 3014 / 54402, 356 ins, 306 del, 2352 sub ] exp/tri7b_DFSMN_M/decode_tgsmall_dev_clean/wer_11_0.0
++
++%WER 4.50 [ 2367 / 52576, 328 ins, 263 del, 1776 sub ] exp/tri7b_DFSMN_M/decode_fglarge_test_clean/wer_13_0.5
++%WER 4.63 [ 2436 / 52576, 328 ins, 279 del, 1829 sub ] exp/tri7b_DFSMN_M/decode_tglarge_test_clean/wer_12_0.5
++%WER 5.50 [ 2894 / 52576, 331 ins, 373 del, 2190 sub ] exp/tri7b_DFSMN_M/decode_tgmed_test_clean/wer_13_0.5
++%WER 5.94 [ 3124 / 52576, 381 ins, 368 del, 2375 sub ] exp/tri7b_DFSMN_M/decode_tgsmall_test_clean/wer_13_0.0
++
++%WER 11.88 [ 6055 / 50948, 650 ins, 891 del, 4514 sub ] exp/tri7b_DFSMN_M/decode_fglarge_dev_other/wer_17_0.5
++%WER 12.24 [ 6236 / 50948, 746 ins, 811 del, 4679 sub ] exp/tri7b_DFSMN_M/decode_tglarge_dev_other/wer_17_0.0
++%WER 14.18 [ 7223 / 50948, 728 ins, 1056 del, 5439 sub ] exp/tri7b_DFSMN_M/decode_tgmed_dev_other/wer_17_0.0
++%WER 15.17 [ 7731 / 50948, 758 ins, 1139 del, 5834 sub ] exp/tri7b_DFSMN_M/decode_tgsmall_dev_other/wer_16_0.0
++
++%WER 12.23 [ 6404 / 52343, 716 ins, 908 del, 4780 sub ] exp/tri7b_DFSMN_M/decode_fglarge_test_other/wer_18_0.0
++%WER 12.61 [ 6598 / 52343, 736 ins, 890 del, 4972 sub ] exp/tri7b_DFSMN_M/decode_tglarge_test_other/wer_16_0.0
++%WER 14.55 [ 7614 / 52343, 710 ins, 1195 del, 5709 sub ] exp/tri7b_DFSMN_M/decode_tgmed_test_other/wer_17_0.0
++%WER 15.51 [ 8119 / 52343, 736 ins, 1272 del, 6111 sub ] exp/tri7b_DFSMN_M/decode_tgsmall_test_other/wer_16_0.0
++
++# Results with nnet DFMSN_L + CE
++# local/nnet/run_fsmn_ivector.sh DFSMN_L
++# Training on the "cleaned" data
++%WER 3.93 [ 2136 / 54402, 287 ins, 210 del, 1639 sub ] exp/tri7b_DFSMN_L/decode_fglarge_dev_clean/wer_12_0.5
++%WER 3.99 [ 2170 / 54402, 279 ins, 225 del, 1666 sub ] exp/tri7b_DFSMN_L/decode_tglarge_dev_clean/wer_12_0.5
++%WER 4.78 [ 2598 / 54402, 317 ins, 272 del, 2009 sub ] exp/tri7b_DFSMN_L/decode_tgmed_dev_clean/wer_12_0.0
++%WER 5.20 [ 2829 / 54402, 320 ins, 303 del, 2206 sub ] exp/tri7b_DFSMN_L/decode_tgsmall_dev_clean/wer_12_0.0
++
++%WER 4.36 [ 2294 / 52576, 285 ins, 267 del, 1742 sub ] exp/tri7b_DFSMN_L/decode_fglarge_test_clean/wer_14_0.5
++%WER 4.45 [ 2342 / 52576, 295 ins, 256 del, 1791 sub ] exp/tri7b_DFSMN_L/decode_tglarge_test_clean/wer_12_0.5
++%WER 5.29 [ 2782 / 52576, 320 ins, 326 del, 2136 sub ] exp/tri7b_DFSMN_L/decode_tgmed_test_clean/wer_12_0.5
++%WER 5.68 [ 2988 / 52576, 372 ins, 317 del, 2299 sub ] exp/tri7b_DFSMN_L/decode_tgsmall_test_clean/wer_11_0.0
++
++%WER 11.71 [ 5964 / 50948, 584 ins, 881 del, 4499 sub ] exp/tri7b_DFSMN_L/decode_fglarge_dev_other/wer_17_0.5
++%WER 12.13 [ 6179 / 50948, 668 ins, 822 del, 4689 sub ] exp/tri7b_DFSMN_L/decode_tglarge_dev_other/wer_17_0.0
++%WER 13.86 [ 7063 / 50948, 694 ins, 1051 del, 5318 sub ] exp/tri7b_DFSMN_L/decode_tgmed_dev_other/wer_17_0.0
++%WER 14.82 [ 7548 / 50948, 718 ins, 1075 del, 5755 sub ] exp/tri7b_DFSMN_L/decode_tgsmall_dev_other/wer_15_0.0
++
++%WER 12.00 [ 6281 / 52343, 724 ins, 813 del, 4744 sub ] exp/tri7b_DFSMN_L/decode_fglarge_test_other/wer_16_0.0
++%WER 12.43 [ 6505 / 52343, 719 ins, 858 del, 4928 sub ] exp/tri7b_DFSMN_L/decode_tglarge_test_other/wer_16_0.0
++%WER 13.99 [ 7323 / 52343, 688 ins, 1125 del, 5510 sub ] exp/tri7b_DFSMN_L/decode_tgmed_test_other/wer_17_0.0
++%WER 14.90 [ 7797 / 52343, 754 ins, 1106 del, 5937 sub ] exp/tri7b_DFSMN_L/decode_tgsmall_test_other/wer_15_0.0
++
++# Results with nnet DFMSN_L + CE + SMBR
++# Training on speed-perturbed and volumn-perturbed "cleaned" data
++%WER 3.60 [ 1959 / 54402, 243 ins, 171 del, 1545 sub ] exp/DFSMN_L_sp_vp_smbr/decode_fglarge_dev_clean/wer_26_0.0
++%WER 3.69 [ 2010 / 54402, 194 ins, 226 del, 1590 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tglarge_dev_clean/wer_25_1.0
++%WER 4.40 [ 2394 / 54402, 213 ins, 278 del, 1903 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgmed_dev_clean/wer_25_0.5
++%WER 4.79 [ 2608 / 54402, 261 ins, 267 del, 2080 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgsmall_dev_clean/wer_19_0.5
++
++%WER 3.96 [ 2083 / 52576, 280 ins, 177 del, 1626 sub ] exp/DFSMN_L_sp_vp_smbr/decode_fglarge_test_clean/wer_23_0.5
++%WER 4.09 [ 2152 / 52576, 243 ins, 238 del, 1671 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tglarge_test_clean/wer_25_1.0
++%WER 4.73 [ 2486 / 52576, 276 ins, 264 del, 1946 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgmed_test_clean/wer_25_0.5
++%WER 5.10 [ 2682 / 52576, 304 ins, 279 del, 2099 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgsmall_test_clean/wer_21_0.5
++
++%WER 10.21 [ 5203 / 50948, 531 ins, 650 del, 4022 sub ] exp/DFSMN_L_sp_vp_smbr/decode_fglarge_dev_other/wer_30_0.5
++%WER 10.77 [ 5485 / 50948, 554 ins, 697 del, 4234 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tglarge_dev_other/wer_29_0.5
++%WER 12.39 [ 6314 / 50948, 534 ins, 891 del, 4889 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgmed_dev_other/wer_29_0.5
++%WER 13.01 [ 6630 / 50948, 608 ins, 885 del, 5137 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgsmall_dev_other/wer_30_0.0
++
++%WER 10.39 [ 5439 / 52343, 560 ins, 637 del, 4242 sub ] exp/DFSMN_L_sp_vp_smbr/decode_fglarge_test_other/wer_30_0.5
++%WER 10.89 [ 5702 / 52343, 580 ins, 696 del, 4426 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tglarge_test_other/wer_30_0.5
++%WER 12.49 [ 6540 / 52343, 669 ins, 782 del, 5089 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgmed_test_other/wer_30_0.0
++%WER 13.29 [ 6958 / 52343, 737 ins, 799 del, 5422 sub ] exp/DFSMN_L_sp_vp_smbr/decode_tgsmall_test_other/wer_26_0.0
+diff --git a/egs/librispeech/s5/conf/fbank.conf b/egs/librispeech/s5/conf/fbank.conf
+new file mode 100644
+index 0000000..25bcdd1
+--- /dev/null
++++ b/egs/librispeech/s5/conf/fbank.conf
+@@ -0,0 +1,6 @@
++--htk-compat=false
++--window-type=hamming # disable Dans window, use the standard
++--use-energy=false    # only fbank outputs
++--dither=1
++--num-mel-bins=80     # 8 filters/octave, 40 filters/16Khz as used by IBM
++--sample-frequency=16000
 diff --git a/egs/librispeech/s5/local/nnet/DFSMN_L.proto b/egs/librispeech/s5/local/nnet/DFSMN_L.proto
 new file mode 100644
 index 0000000..738b486
@@ -119,10 +265,10 @@ index 0000000..cd2d026
 +
 diff --git a/egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh b/egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh
 new file mode 100644
-index 0000000..25416d9
+index 0000000..dcebb00
 --- /dev/null
 +++ b/egs/librispeech/s5/local/nnet/run_fsmn_ivector.sh
-@@ -0,0 +1,144 @@
+@@ -0,0 +1,142 @@
 +. ./path.sh
 +. ./cmd.sh
 +
@@ -135,7 +281,20 @@ index 0000000..25416d9
 +
 +dnn_model=$1
 +
-+stage=1
++stage=0
++
++if [ $stage -le 0 ]; then
++ min_seg_len=1.55
++ train_set=train_960_cleaned
++ gmm=tri6b_cleaned
++ nnet3_affix=_cleaned
++ local/nnet3/run_ivector_common.sh --stage $stage \
++                                   --min-seg-len $min_seg_len \
++                                   --train-set $train_set \
++                                   --gmm $gmm \
++                                   --num-threads-ubm 6 --num-processes 3 \
++                                   --nnet3-affix "$nnet3_affix" || exit 1;
++then
 +
 +##Make fbank features
 +if [ $stage -le 1 ]; then
@@ -145,7 +304,7 @@ index 0000000..25416d9
 +  fbankdir=fbank/$x
 +  
 +  cp -r data/$x data_fbank/$x
-+  steps/make_fbank.sh --nj 30 --cmd "$train_cmd"  --fbank-config conf/fbank.cfg \
++  steps/make_fbank.sh --nj 30 --cmd "$train_cmd"  --fbank-config conf/fbank.conf \
 +    data_fbank/$x exp/make_fbank/$x $fbankdir
 +  steps/compute_cmvn_stats.sh data_fbank/$x exp/make_fbank/$x $fbankdir
 +done
@@ -165,7 +324,7 @@ index 0000000..25416d9
 +dir=exp/tri7b_${dnn_model}
 +data_fbk=data_fbank
 +if [ $stage -le 3 ]; then
-+	proto=local/nnet/${dnn_model}.proto
++	proto=proto/${dnn_model}.proto
 +
 +        cat exp/nnet3_cleaned/ivectors_train_960_cleaned_hires/ivector_online.scp exp/nnet3_cleaned/ivectors_dev_clean_hires/ivector_online.scp \
 +            exp/nnet3_cleaned/ivectors_dev_other_hires/ivector_online.scp > exp/nnet3_cleaned/ivectors_train_960_dev_hires/ivector_online.scp
@@ -189,8 +348,7 @@ index 0000000..25416d9
 +  	for set in $dataset
 +  	do
 +  	  	steps/nnet/decode.sh --nj 16 --cmd "$decode_cmd" \
-+		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
-+      		--config conf/decode.config --acwt $acwt \
++      		--acwt $acwt \
 +		$gmm/graph_tgsmall \
 +        	$data_fbk/$set $dir/decode_tgsmall_${set}
 +
@@ -198,29 +356,23 @@ index 0000000..25416d9
 +        	$data_fbk/$set $dir/decode_{tgsmall,tgmed}_${set}
 +        	
 +		steps/lmrescore_const_arpa.sh \
-+		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
 +        	--cmd "$decode_cmd" data/lang_test_{tgsmall,tglarge} \
 +       		$data_fbk/$set $dir/decode_{tgsmall,tglarge}_${set}
 +        	
 +		steps/lmrescore_const_arpa.sh \
-+		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
 +        	--cmd "$decode_cmd" data/lang_test_{tgsmall,fglarge} \
 +        	$data_fbk/$set $dir/decode_{tgsmall,fglarge}_${set}
 +  	done
-+
-+	for set in $dataset; 
-+	do 
-+	for lm in fglarge tglarge tgmed tgsmall; 
-+	do 
-+		grep WER $dir/decode_${lm}_${set}*/wer* | ./utils/best_wer.sh 
-+	done
++	for x in $dir/decode_*;
++	do
++        	grep WER $x/wer_* | utils/best_wer.sh
 +	done
 +fi
 +
 +nj=32
 +if [ $stage -le 5 ]; then
 +        steps/nnet/align.sh --nj $nj --cmd "$train_cmd" $data_fbk/train_960_cleaned data/lang $dir ${dir}_ali
-+        steps/nnet/make_denlats.sh --nj $nj --cmd "$decode_cmd" --config conf/decode_dnn.config --acwt $acwt \
++        steps/nnet/make_denlats.sh --nj $nj --cmd "$decode_cmd" --acwt $acwt \
 +        $data_fbk/train_960_cleaned data/lang $dir ${dir}_denlats
 +fi
 +
@@ -229,7 +381,6 @@ index 0000000..25416d9
 +        steps/nnet/train_mpe.sh --cmd "$cuda_cmd" --num-iters 2 --learn-rate 0.0000002 --acwt $acwt --do-smbr true \
 +        $data_fbk/train_960_cleaned data/lang $dir ${dir}_ali ${dir}_denlats ${dir}_smbr
 +fi
-+
 +###decode
 +dir=${dir}_smbr
 +acwt=0.03
@@ -239,8 +390,7 @@ index 0000000..25416d9
 +        for set in $dataset
 +        do
 +                steps/nnet/decode.sh --nj 16 --cmd "$decode_cmd" \
-+		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
-+                --config conf/decode_dnn.config --acwt $acwt \
++                --acwt $acwt \
 +                $gmm/graph_tgsmall \
 +                $data_fbk/$set $dir/decode_tgsmall_${set}
 +
@@ -248,66 +398,762 @@ index 0000000..25416d9
 +                $data_fbk/$set $dir/decode_{tgsmall,tgmed}_${set}
 +
 +                steps/lmrescore_const_arpa.sh \
-+		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
 +                --cmd "$decode_cmd" data/lang_test_{tgsmall,tglarge} \
 +                $data_fbk/$set $dir/decode_{tgsmall,tglarge}_${set}
 +
 +                steps/lmrescore_const_arpa.sh \
-+		scoring_opts "--min-lmwt 10 --max-lmwt 30" \
 +                --cmd "$decode_cmd" data/lang_test_{tgsmall,fglarge} \
 +                $data_fbk/$set $dir/decode_{tgsmall,fglarge}_${set}
 +        done
-+	for set in $dataset;
++        for x in $dir/decode_*;
 +        do
-+        for lm in fglarge tglarge tgmed tgsmall;
-+        do
-+                grep WER $dir/decode_${lm}_${set}*/wer* | ./utils/best_wer.sh
++                grep WER $x/wer_* | utils/best_wer.sh
 +        done
-+        done
-+
 +fi
 +
-diff --git a/src/cudamatrix/cu-device.cc b/src/cudamatrix/cu-device.cc
-index c5114ed..1ac9d68 100644
---- a/src/cudamatrix/cu-device.cc
-+++ b/src/cudamatrix/cu-device.cc
-@@ -219,6 +219,23 @@ void CuDevice::SelectGpuId(std::string use_gpu) {
-   }
- }
+diff --git a/egs/librispeech/s5/run.sh b/egs/librispeech/s5/run.sh
+index 1b12f51..d2b8b4b 100755
+--- a/egs/librispeech/s5/run.sh
++++ b/egs/librispeech/s5/run.sh
+@@ -353,7 +353,7 @@ local/run_cleanup_segmentation.sh
  
-+void CuDevice::SetGpuId(int n) {
-+  cudaError_t e = cudaSetDevice(n);
-+  if (e == cudaSuccess) {
-+      char name[128];
-+      DeviceGetName(name,128,n);
-+      int64 free, total;
-+      std::string mem_stats;
-+      mem_stats = GetFreeMemory(&free, &total);
-+      KALDI_LOG << "cudaSetDevice(" << n << "): "
-+                        << name << "\t" << mem_stats;
-+      FinalizeActiveGpu();
-+  }
-+  else{
-+      KALDI_WARN << "Cannot select this device: return code " << e
-+                  << ", Error message: \"" << cudaGetErrorString(e) << "\"";
-+  }
-+}
  
- void CuDevice::FinalizeActiveGpu() {
-   // The device at this point should have active GPU, so we can query its name
-diff --git a/src/cudamatrix/cu-device.h b/src/cudamatrix/cu-device.h
-index 9910535..c99b36b 100644
---- a/src/cudamatrix/cu-device.h
-+++ b/src/cudamatrix/cu-device.h
-@@ -98,6 +98,8 @@ class CuDevice {
-     return active_gpu_id_;
-   }
+ # train nnet3 tdnn models on the entire data with data-cleaning (xent and chain)
+-local/chain/run_tdnn.sh # set "--stage 11" if you have already run local/nnet3/run_tdnn.sh
++#local/chain/run_tdnn.sh # set "--stage 11" if you have already run local/nnet3/run_tdnn.sh
  
-+  void SetGpuId(int n);
+ # The nnet3 TDNN recipe:
+ # local/nnet3/run_tdnn.sh # set "--stage 11" if you have already run local/chain/run_tdnn.sh
+@@ -372,5 +372,15 @@ local/chain/run_tdnn.sh # set "--stage 11" if you have already run local/nnet3/r
+ # ## to train but slightly worse.
+ # # local/online/run_nnet2.sh
+ 
 +
-   /// Returns true if either we have no GPU, or we have a GPU
-   /// and it supports double precision.
-   bool DoublePrecisionSupported();
++# ## Traing FSMN models on the cleaned-up data
++# ## Three configurations of DFSMN with different model size: DFSMN_S, DFSMN_M, DFSMN_L
++local/nnet/run_fsmn_ivector.sh DFSMN_S
++# local/nnet/run_fsmn_ivector.sh DFSMN_M
++# local/nnet/run_fsmn_ivector.sh DFSMN_L
++
++# Wait for decodings in the background
++
++
+ # Wait for decodings in the background
+ wait
+diff --git a/egs/wsj/s5/steps/nnet/train_faster.sh b/egs/wsj/s5/steps/nnet/train_faster.sh
+new file mode 100755
+index 0000000..b751e69
+--- /dev/null
++++ b/egs/wsj/s5/steps/nnet/train_faster.sh
+@@ -0,0 +1,481 @@
++#!/bin/bash
++
++# Copyright 2012-2017  Brno University of Technology (author: Karel Vesely)
++# Apache 2.0
++
++# Begin configuration.
++
++config=             # config, also forwarded to 'train_scheduler.sh',
++
++# topology, initialization,
++network_type=dnn    # select type of neural network (dnn,cnn1d,cnn2d,lstm),
++hid_layers=4        # nr. of hidden layers (before sotfmax or bottleneck),
++hid_dim=1024        # number of neurons per layer,
++bn_dim=             # (optional) adds bottleneck and one more hidden layer to the NN,
++dbn=                # (optional) prepend layers to the initialized NN,
++
++proto_opts=         # adds options to 'make_nnet_proto.py',
++cnn_proto_opts=     # adds options to 'make_cnn_proto.py',
++
++nnet_init=          # (optional) use this pre-initialized NN,
++nnet_proto=         # (optional) use this NN prototype for initialization,
++
++# feature processing,
++splice=5            # (default) splice features both-ways along time axis,
++cmvn_opts=          # (optional) adds 'apply-cmvn' to input feature pipeline, see opts,
++delta_opts=         # (optional) adds 'add-deltas' to input feature pipeline, see opts,
++ivector=            # (optional) adds 'append-vector-to-feats', the option is rx-filename for the 2nd stream,
++ivector_append_tool=append-vector-to-feats # (optional) the tool for appending ivectors,
++
++feat_type=plain
++traps_dct_basis=11    # (feat_type=traps) nr. of DCT basis, 11 is good with splice=10,
++transf=               # (feat_type=transf) import this linear tranform,
++splice_after_transf=5 # (feat_type=transf) splice after the linear transform,
++
++feature_transform_proto= # (optional) use this prototype for 'feature_transform',
++feature_transform=  # (optional) directly use this 'feature_transform',
++pytel_transform=    # (BUT) use external python transform,
++
++# labels,
++labels=            # (optional) specify non-default training targets,
++                   # (targets need to be in posterior format, see 'ali-to-post', 'feat-to-post'),
++num_tgt=           # (optional) specifiy number of NN outputs, to be used with 'labels=',
++
++# training scheduler,
++learn_rate=0.008   # initial learning rate,
++momentum=0
++start_half_lr=5    # start to anneal the learning rate
++seed=777           # random seed
++scheduler_opts=    # options, passed to the training scheduler,
++train_tool=        # optionally change the training tool,
++train_tool_opts=   # options for the training tool,
++frame_weights=     # per-frame weights for gradient weighting,
++utt_weights=       # per-utterance weights (scalar for --frame-weights),
++
++# data processing, misc.
++copy_feats=false     # resave the train/cv features into /tmp (disabled by default),
++copy_feats_tmproot=/tmp/kaldi.XXXX # sets tmproot for 'copy-feats',
++copy_feats_compress=true # compress feats while resaving
++feats_std=1.0
++
++split_feats=        # split the training data into N portions, one portion will be one 'epoch',
++                    # (empty = no splitting)
++
++seed=777            # seed value used for data-shuffling, nn-initialization, and training,
++skip_cuda_check=false
++skip_phoneset_check=false
++
++# End configuration.
++
++echo "$0 $@"  # Print the command line for logging
++
++[ -f path.sh ] && . ./path.sh;
++. parse_options.sh || exit 1;
++
++set -euo pipefail
++
++if [ $# != 6 ]; then
++   echo "Usage: $0 <data-train> <data-dev> <lang-dir> <ali-train> <ali-dev> <exp-dir>"
++   echo " e.g.: $0 data/train data/cv data/lang exp/mono_ali_train exp/mono_ali_cv exp/mono_nnet"
++   echo ""
++   echo " Training data : <data-train>,<ali-train> (for optimizing cross-entropy)"
++   echo " Held-out data : <data-dev>,<ali-dev> (for learn-rate scheduling, model selection)"
++   echo " note.: <ali-train>,<ali-dev> can point to same directory, or 2 separate directories."
++   echo ""
++   echo "main options (for others, see top of script file)"
++   echo "  --config <config-file>   # config containing options"
++   echo ""
++   echo "  --network-type (dnn,cnn1d,cnn2d,lstm)  # type of neural network"
++   echo "  --nnet-proto <file>      # use this NN prototype"
++   echo "  --feature-transform <file> # re-use this input feature transform"
++   echo ""
++   echo "  --feat-type (plain|traps|transf) # type of input features"
++   echo "  --cmvn-opts  <string>            # add 'apply-cmvn' to input feature pipeline"
++   echo "  --delta-opts <string>            # add 'add-deltas' to input feature pipeline"
++   echo "  --splice <N>                     # splice +/-N frames of input features"
++   echo
++   echo "  --learn-rate <float>     # initial leaning-rate"
++   echo "  --copy-feats <bool>      # copy features to /tmp, lowers storage stress"
++   echo ""
++   exit 1;
++fi
++
++data=$1
++data_cv=$2
++lang=$3
++alidir=$4
++alidir_cv=$5
++dir=$6
++
++# Using alidir for supervision (default)
++if [ -z "$labels" ]; then
++  silphonelist=`cat $lang/phones/silence.csl`
++  for f in $alidir/final.mdl $alidir/ali.1.gz $alidir_cv/ali.1.gz; do
++    [ ! -f $f ] && echo "$0: no such file $f" && exit 1;
++  done
++fi
++
++for f in $data/feats.scp $data_cv/feats.scp; do
++  [ ! -f $f ] && echo "$0: no such file $f" && exit 1;
++done
++
++echo
++echo "# INFO"
++echo "$0 : Training Neural Network"
++printf "\t dir       : $dir \n"
++printf "\t Train-set : $data $(cat $data/feats.scp | wc -l), $alidir \n"
++printf "\t CV-set    : $data_cv $(cat $data_cv/feats.scp | wc -l) $alidir_cv \n"
++echo
++
++mkdir -p $dir/{log,nnet}
++
++if ! $skip_phoneset_check; then
++  utils/lang/check_phones_compatible.sh $lang/phones.txt $alidir/phones.txt
++  utils/lang/check_phones_compatible.sh $lang/phones.txt $alidir_cv/phones.txt
++  cp $lang/phones.txt $dir
++fi
++
++# skip when already trained,
++if [ -e $dir/final.nnet ]; then
++  echo "SKIPPING TRAINING... ($0)"
++  echo "nnet already trained : $dir/final.nnet ($(readlink $dir/final.nnet))"
++  exit 0
++fi
++
++# check if CUDA compiled in and GPU is available,
++if ! $skip_cuda_check; then cuda-gpu-available || exit 1; fi
++
++###### PREPARE ALIGNMENTS ######
++echo
++echo "# PREPARING ALIGNMENTS"
++if [ ! -z "$labels" ]; then
++  echo "Using targets '$labels' (by force)"
++  labels_tr="$labels"
++  labels_cv="$labels"
++else
++  echo "Using PDF targets from dirs '$alidir' '$alidir_cv'"
++  # training targets in posterior format,
++  labels_tr="ark:ali-to-pdf $alidir/final.mdl \"ark:gunzip -c $alidir/ali.*.gz |\" ark:- | ali-to-post ark:- ark:- |"
++  labels_cv="ark:ali-to-pdf $alidir/final.mdl \"ark:gunzip -c $alidir_cv/ali.*.gz |\" ark:- | ali-to-post ark:- ark:- |"
++  # training targets for analyze-counts,
++  labels_tr_pdf="ark:ali-to-pdf $alidir/final.mdl \"ark:gunzip -c $alidir/ali.*.gz |\" ark:- |"
++  labels_tr_phn="ark:ali-to-phones --per-frame=true $alidir/final.mdl \"ark:gunzip -c $alidir/ali.*.gz |\" ark:- |"
++
++  # get pdf-counts, used later for decoding/aligning,
++  num_pdf=$(hmm-info $alidir/final.mdl | awk '/pdfs/{print $4}')
++  analyze-counts --verbose=1 --binary=false --counts-dim=$num_pdf \
++    ${frame_weights:+ "--frame-weights=$frame_weights"} \
++    ${utt_weights:+ "--utt-weights=$utt_weights"} \
++    "$labels_tr_pdf" $dir/ali_train_pdf.counts 2>$dir/log/analyze_counts_pdf.log
++  # copy the old transition model, will be needed by decoder,
++  copy-transition-model --binary=false $alidir/final.mdl $dir/final.mdl
++  # copy the tree
++  cp $alidir/tree $dir/tree
++
++  # make phone counts for analysis,
++  [ -e $lang/phones.txt ] && analyze-counts --verbose=1 --symbol-table=$lang/phones.txt --counts-dim=$num_pdf \
++    ${frame_weights:+ "--frame-weights=$frame_weights"} \
++    ${utt_weights:+ "--utt-weights=$utt_weights"} \
++    "$labels_tr_phn" /dev/null 2>$dir/log/analyze_counts_phones.log
++fi
++
++###### PREPARE FEATURES ######
++echo
++echo "# PREPARING FEATURES"
++if [ "$copy_feats" == "true" ]; then
++  echo "# re-saving features to local disk,"
++  tmpdir=$(mktemp -d $copy_feats_tmproot)
++  copy-feats --compress=$copy_feats_compress scp:$data/feats.scp ark,scp:$tmpdir/train.ark,$dir/train_sorted.scp
++  copy-feats --compress=$copy_feats_compress scp:$data_cv/feats.scp ark,scp:$tmpdir/cv.ark,$dir/cv.scp
++  trap "echo '# Removing features tmpdir $tmpdir @ $(hostname)'; ls $tmpdir; rm -r $tmpdir" EXIT
++else
++  # or copy the list,
++  cp $data/feats.scp $dir/train_sorted.scp
++  cp $data_cv/feats.scp $dir/cv.scp
++fi
++# shuffle the list,
++utils/shuffle_list.pl --srand ${seed:-777} <$dir/train_sorted.scp >$dir/train.scp
++
++# create a 10k utt subset for global cmvn estimates,
++head -n 10000 $dir/train.scp > $dir/train.scp.10k
++head -n 1000 $dir/train.scp > $dir/train.scp.1k
++
++# split the list,
++if [ -n "$split_feats" ]; then
++  scps= # 1..split_feats,
++  for (( ii=1; ii<=$split_feats; ii++ )); do scps="$scps $dir/train.${ii}.scp"; done
++  utils/split_scp.pl $dir/train.scp $scps
++fi
++
++# for debugging, add lists with non-local features,
++utils/shuffle_list.pl --srand ${seed:-777} <$data/feats.scp >$dir/train.scp_non_local
++cp $data_cv/feats.scp $dir/cv.scp_non_local
++
++###### OPTIONALLY IMPORT FEATURE SETTINGS (from pre-training) ######
++ivector_dim= # no ivectors,
++if [ ! -z $feature_transform ]; then
++  D=$(dirname $feature_transform)
++  echo "# importing feature settings from dir '$D'"
++  [ -e $D/norm_vars ] && cmvn_opts="--norm-means=true --norm-vars=$(cat $D/norm_vars)" # Bwd-compatibility,
++  [ -e $D/cmvn_opts ] && cmvn_opts=$(cat $D/cmvn_opts)
++  [ -e $D/delta_order ] && delta_opts="--delta-order=$(cat $D/delta_order)" # Bwd-compatibility,
++  [ -e $D/delta_opts ] && delta_opts=$(cat $D/delta_opts)
++  [ -e $D/ivector_dim ] && ivector_dim=$(cat $D/ivector_dim)
++  [ -e $D/ivector_append_tool ] && ivector_append_tool=$(cat $D/ivector_append_tool)
++  echo "# cmvn_opts='$cmvn_opts' delta_opts='$delta_opts' ivector_dim='$ivector_dim'"
++fi
++
++###### PREPARE FEATURE PIPELINE ######
++# read the features,
++feats_tr="ark:copy-feats scp:$dir/train.scp ark:- |"
++feats_cv="ark:copy-feats scp:$dir/cv.scp ark:- |"
++
++# optionally add per-speaker CMVN,
++if [ ! -z "$cmvn_opts" ]; then
++  echo "# + 'apply-cmvn' with '$cmvn_opts' using statistics : $data/cmvn.scp, $data_cv/cmvn.scp"
++  [ ! -r $data/cmvn.scp ] && echo "Missing $data/cmvn.scp" && exit 1;
++  [ ! -r $data_cv/cmvn.scp ] && echo "Missing $data_cv/cmvn.scp" && exit 1;
++  feats_tr="$feats_tr apply-cmvn $cmvn_opts --utt2spk=ark:$data/utt2spk scp:$data/cmvn.scp ark:- ark:- |"
++  feats_cv="$feats_cv apply-cmvn $cmvn_opts --utt2spk=ark:$data_cv/utt2spk scp:$data_cv/cmvn.scp ark:- ark:- |"
++else
++  echo "# 'apply-cmvn' is not used,"
++fi
++
++# optionally add deltas,
++if [ ! -z "$delta_opts" ]; then
++  feats_tr="$feats_tr add-deltas $delta_opts ark:- ark:- |"
++  feats_cv="$feats_cv add-deltas $delta_opts ark:- ark:- |"
++  echo "# + 'add-deltas' with '$delta_opts'"
++fi
++
++# keep track of the config,
++[ ! -z "$cmvn_opts" ] && echo "$cmvn_opts" >$dir/cmvn_opts
++[ ! -z "$delta_opts" ] && echo "$delta_opts" >$dir/delta_opts
++#
++
++# optionally append python feature transform,
++if [ ! -z "$pytel_transform" ]; then
++  cp $pytel_transform $dir/pytel_transform.py
++  { echo; echo "### Comes from here: '$pytel_transform' ###"; } >> $dir/pytel_transform.py
++  pytel_transform=$dir/pytel_transform.py
++  feats_tr="$feats_tr /bin/env python $pytel_transform |"
++  feats_cv="$feats_cv /bin/env python $pytel_transform |"
++  echo "# + 'pytel-transform' from '$pytel_transform'"
++fi
++
++# temoprary pipeline with first 1k,
++feats_tr_1k="${feats_tr/train.scp/train.scp.1k}"
++
++if [ ! -z $ivector ]; then
++  echo
++  echo "# ADDING IVECTOR FEATURES"
++
++  echo "# getting dims,"
++  dim_raw=$(feat-to-dim "$feats_tr_1k" -)
++  dim_raw_and_ivec=$(feat-to-dim "$feats_tr_1k $ivector_append_tool ark:- '$ivector' ark:- |" -)
++  dim_ivec=$((dim_raw_and_ivec - dim_raw))
++  echo "# dims, feats-raw $dim_raw, ivectors $dim_ivec,"
++
++  echo $dim_ivec >$dir/ivector_dim # mark down the iVec dim!
++  echo $ivector_append_tool >$dir/ivector_append_tool
++
++  # pasting the iVecs to the feaures,
++  echo "# + ivector input '$ivector'"
++  feats_tr="$feats_tr $ivector_append_tool ark:- '$ivector' ark:- |"
++  feats_cv="$feats_cv $ivector_append_tool ark:- '$ivector' ark:- |"
++fi
++
++# temoprary pipeline with first 10k,
++feats_tr_10k="${feats_tr/train.scp/train.scp.10k}"
++
++# get feature dim,
++feat_dim=$(feat-to-dim "$feats_tr_10k" -)
++echo "# feature dim : $feat_dim (input of 'feature_transform')"
++
++
++# Now we start building 'feature_transform' which goes right in front of a NN.
++# The forwarding is computed on a GPU before the frame shuffling is applied.
++#
++# Same GPU is used both for 'feature_transform' and the NN training.
++# So it has to be done by a single process (we are using exclusive mode).
++# This also reduces the CPU-GPU uploads/downloads to minimum.
++
++if [ ! -z "$feature_transform" ]; then
++  echo "# importing 'feature_transform' from '$feature_transform'"
++  tmp=$dir/imported_$(basename $feature_transform)
++  cp $feature_transform $tmp; feature_transform=$tmp
++else
++  # Make default proto with splice,
++  if [ ! -z $feature_transform_proto ]; then
++    echo "# importing custom 'feature_transform_proto' from '$feature_transform_proto'"
++  else
++    echo "# + default 'feature_transform_proto' with splice +/-$splice frames,"
++    feature_transform_proto=$dir/splice${splice}.proto
++    echo "<Splice> <InputDim> $feat_dim <OutputDim> $(((2*splice+1)*feat_dim)) <BuildVector> -$splice:$splice </BuildVector>" >$feature_transform_proto
++  fi
++
++  # Initialize 'feature-transform' from a prototype,
++  feature_transform=$dir/tr_$(basename $feature_transform_proto .proto).nnet
++  nnet-initialize --binary=false $feature_transform_proto $feature_transform
++
++  # Choose further processing of spliced features
++  echo "# feature type : $feat_type"
++  case $feat_type in
++    plain)
++    ;;
++    traps)
++      #generate hamming+dct transform
++      feature_transform_old=$feature_transform
++      feature_transform=${feature_transform%.nnet}_hamm_dct${traps_dct_basis}.nnet
++      echo "# + Hamming DCT transform (t$((splice*2+1)),dct${traps_dct_basis}) into '$feature_transform'"
++      #prepare matrices with time-transposed hamming and dct
++      utils/nnet/gen_hamm_mat.py --fea-dim=$feat_dim --splice=$splice > $dir/hamm.mat
++      utils/nnet/gen_dct_mat.py --fea-dim=$feat_dim --splice=$splice --dct-basis=$traps_dct_basis > $dir/dct.mat
++      #put everything together
++      compose-transforms --binary=false $dir/dct.mat $dir/hamm.mat - | \
++        transf-to-nnet - - | \
++        nnet-concat --binary=false $feature_transform_old - $feature_transform
++    ;;
++    transf)
++      feature_transform_old=$feature_transform
++      feature_transform=${feature_transform%.nnet}_transf_splice${splice_after_transf}.nnet
++      [ -z $transf ] && transf=$alidir/final.mat
++      [ ! -f $transf ] && echo "Missing transf $transf" && exit 1
++      feat_dim=$(feat-to-dim "$feats_tr_10k nnet-forward 'nnet-concat $feature_transform_old \"transf-to-nnet $transf - |\" - |' ark:- ark:- |" -)
++      nnet-concat --binary=false $feature_transform_old \
++        "transf-to-nnet $transf - |" \
++        "utils/nnet/gen_splice.py --fea-dim=$feat_dim --splice=$splice_after_transf |" \
++        $feature_transform
++    ;;
++    *)
++      echo "Unknown feature type $feat_type"
++      exit 1;
++    ;;
++  esac
++
++  # keep track of feat_type,
++  echo $feat_type > $dir/feat_type
++
++  # Renormalize the MLP input to zero mean and unit variance,
++  feature_transform_old=$feature_transform
++  feature_transform=${feature_transform%.nnet}_cmvn-g.nnet
++  echo "# compute normalization stats from 10k sentences"
++  nnet-forward --print-args=true --use-gpu=yes $feature_transform_old \
++    "$feats_tr_10k" ark:- |\
++    compute-cmvn-stats ark:- $dir/cmvn-g.stats
++  echo "# + normalization of NN-input at '$feature_transform'"
++  nnet-concat --binary=false $feature_transform_old \
++    "cmvn-to-nnet --std-dev=$feats_std $dir/cmvn-g.stats -|" $feature_transform
++fi
++
++
++###### Show the final 'feature_transform' in the log,
++echo
++echo "### Showing the final 'feature_transform':"
++nnet-info $feature_transform
++echo "###"
++
++###### MAKE LINK TO THE FINAL feature_transform, so the other scripts will find it ######
++[ -f $dir/final.feature_transform ] && unlink $dir/final.feature_transform
++(cd $dir; ln -s $(basename $feature_transform) final.feature_transform )
++feature_transform=$dir/final.feature_transform
++
++
++###### INITIALIZE THE NNET ######
++echo
++echo "# NN-INITIALIZATION"
++if [ ! -z $nnet_init ]; then
++  echo "# using pre-initialized network '$nnet_init'"
++elif [ ! -z $nnet_proto ]; then
++  echo "# initializing NN from prototype '$nnet_proto'";
++  nnet_init=$dir/nnet.init; log=$dir/log/nnet_initialize.log
++  nnet-initialize --seed=$seed $nnet_proto $nnet_init
++else
++  echo "# getting input/output dims :"
++  # input-dim,
++  get_dim_from=$feature_transform
++  [ ! -z "$dbn" ] && get_dim_from="nnet-concat $feature_transform '$dbn' -|"
++  num_fea=$(feat-to-dim "$feats_tr_10k nnet-forward \"$get_dim_from\" ark:- ark:- |" -)
++
++  # output-dim,
++  [ -z $num_tgt ] && \
++    num_tgt=$(hmm-info --print-args=false $alidir/final.mdl | grep pdfs | awk '{ print $NF }')
++
++  # make network prototype,
++  nnet_proto=$dir/nnet.proto
++  echo "# genrating network prototype $nnet_proto"
++  case "$network_type" in
++    dnn)
++      utils/nnet/make_nnet_proto.py $proto_opts \
++        ${bn_dim:+ --bottleneck-dim=$bn_dim} \
++        $num_fea $num_tgt $hid_layers $hid_dim >$nnet_proto
++      ;;
++    cnn1d)
++      delta_order=$([ -z $delta_opts ] && echo "0" || { echo $delta_opts | tr ' ' '\n' | grep "delta[-_]order" | sed 's:^.*=::'; })
++      echo "Debug : $delta_opts, delta_order $delta_order"
++      utils/nnet/make_cnn_proto.py $cnn_proto_opts \
++        --splice=$splice --delta-order=$delta_order --dir=$dir \
++        $num_fea >$nnet_proto
++      cnn_fea=$(cat $nnet_proto | grep -v '^$' | tail -n1 | awk '{ print $5; }')
++      utils/nnet/make_nnet_proto.py $proto_opts \
++        --no-smaller-input-weights \
++        ${bn_dim:+ --bottleneck-dim=$bn_dim} \
++        "$cnn_fea" $num_tgt $hid_layers $hid_dim >>$nnet_proto
++      ;;
++    cnn2d)
++      delta_order=$([ -z $delta_opts ] && echo "0" || { echo $delta_opts | tr ' ' '\n' | grep "delta[-_]order" | sed 's:^.*=::'; })
++      echo "Debug : $delta_opts, delta_order $delta_order"
++      utils/nnet/make_cnn2d_proto.py $cnn_proto_opts \
++        --splice=$splice --delta-order=$delta_order --dir=$dir \
++        $num_fea >$nnet_proto
++      cnn_fea=$(cat $nnet_proto | grep -v '^$' | tail -n1 | awk '{ print $5; }')
++      utils/nnet/make_nnet_proto.py $proto_opts \
++        --no-smaller-input-weights \
++        ${bn_dim:+ --bottleneck-dim=$bn_dim} \
++        "$cnn_fea" $num_tgt $hid_layers $hid_dim >>$nnet_proto
++      ;;
++    lstm)
++      utils/nnet/make_lstm_proto.py $proto_opts \
++        $num_fea $num_tgt >$nnet_proto
++      ;;
++    blstm)
++      utils/nnet/make_blstm_proto.py $proto_opts \
++        $num_fea $num_tgt >$nnet_proto
++      ;;
++    *) echo "Unknown : --network-type $network_type" && exit 1;
++  esac
++
++  # initialize,
++  nnet_init=$dir/nnet.init
++  echo "# initializing the NN '$nnet_proto' -> '$nnet_init'"
++  nnet-initialize --seed=$seed $nnet_proto $nnet_init
++
++  # optionally prepend dbn to the initialization,
++  if [ ! -z "$dbn" ]; then
++    nnet_init_old=$nnet_init; nnet_init=$dir/nnet_dbn_dnn.init
++    nnet-concat "$dbn" $nnet_init_old $nnet_init
++  fi
++fi
++
++
++###### TRAIN ######
++echo
++echo "# RUNNING THE NN-TRAINING SCHEDULER"
++steps/nnet/train_faster_scheduler.sh \
++  ${scheduler_opts} \
++  ${train_tool:+ --train-tool "$train_tool"} \
++  ${train_tool_opts:+ --train-tool-opts "$train_tool_opts"} \
++  ${feature_transform:+ --feature-transform $feature_transform} \
++  ${split_feats:+ --split-feats $split_feats} \
++  --learn-rate $learn_rate \
++  --momentum $momentum \
++  --start_half_lr $start_half_lr\
++  ${frame_weights:+ --frame-weights "$frame_weights"} \
++  ${utt_weights:+ --utt-weights "$utt_weights"} \
++  ${config:+ --config $config} \
++  $nnet_init "$feats_tr" "$feats_cv" "$labels_tr" "$labels_cv" $dir
++
++echo "$0: Successfuly finished. '$dir'"
++
++sleep 3
++exit 0
+diff --git a/egs/wsj/s5/steps/nnet/train_faster_scheduler.sh b/egs/wsj/s5/steps/nnet/train_faster_scheduler.sh
+new file mode 100755
+index 0000000..8a20442
+--- /dev/null
++++ b/egs/wsj/s5/steps/nnet/train_faster_scheduler.sh
+@@ -0,0 +1,221 @@
++#!/bin/bash
++
++# Copyright 2012-2017  Brno University of Technology (author: Karel Vesely)
++# Apache 2.0
++
++# Schedules epochs and controls learning rate during the neural network training
++
++# Begin configuration.
++
++# training options,
++learn_rate=0.008
++momentum=0
++l1_penalty=0
++l2_penalty=0
++
++# data processing,
++train_tool="nnet-train-frmshuff"
++train_tool_opts=""
++feature_transform=
++
++split_feats= # int -> number of splits 'feats.scp -> feats.${i}.scp', starting from feats.1.scp,
++             # (data are alredy shuffled and split to N parts),
++             # empty -> no splitting,
++
++# learn rate scheduling,
++max_iters=10
++min_iters=0 # keep training, disable weight rejection, start learn-rate halving as usual,
++keep_lr_iters=0 # fix learning rate for N initial epochs, disable weight rejection,
++dropout_schedule= # dropout-rates for N initial epochs, for example: 0.1,0.1,0.1,0.1,0.1,0.0
++start_halving_impr=0.01
++end_halving_impr=0.001
++halving_factor=0.5
++start_half_lr=5 
++randseed=777
++
++
++# misc,
++verbose=0 # 0 No GPU time-stats, 1 with GPU time-stats (slower),
++frame_weights=
++utt_weights=
++
++# End configuration.
++
++echo "$0 $@"  # Print the command line for logging
++[ -f path.sh ] && . ./path.sh;
++
++. parse_options.sh || exit 1;
++
++set -euo pipefail
++
++if [ $# != 6 ]; then
++   echo "Usage: $0 <mlp-init> <feats-tr> <feats-cv> <labels-tr> <labels-cv> <exp-dir>"
++   echo " e.g.: $0 0.nnet scp:train.scp scp:cv.scp ark:labels_tr.ark ark:labels_cv.ark exp/dnn1"
++   echo "main options (for others, see top of script file)"
++   echo "  --config <config-file>  # config containing options"
++   exit 1;
++fi
++
++mlp_init=$1
++feats_tr=$2
++feats_cv=$3
++labels_tr=$4
++labels_cv=$5
++dir=$6
++
++[ ! -d $dir ] && mkdir $dir
++[ ! -d $dir/log ] && mkdir $dir/log
++[ ! -d $dir/nnet ] && mkdir $dir/nnet
++
++dropout_array=($(echo ${dropout_schedule} | tr ',' ' '))
++
++# Skip training
++[ -e $dir/final.nnet ] && echo "'$dir/final.nnet' exists, skipping training" && exit 0
++
++##############################
++# start training
++
++# choose mlp to start with,
++mlp_best=$mlp_init
++mlp_base=${mlp_init##*/}; mlp_base=${mlp_base%.*}
++
++# optionally resume training from the best epoch, using saved learning-rate,
++[ -e $dir/.mlp_best ] && mlp_best=$(cat $dir/.mlp_best)
++[ -e $dir/.learn_rate ] && learn_rate=$(cat $dir/.learn_rate)
++
++# cross-validation on original network,
++log=$dir/log/iter00.initial.log; hostname>$log
++$train_tool --cross-validate=true --randomize=false --verbose=$verbose $train_tool_opts \
++  ${feature_transform:+ --feature-transform=$feature_transform} \
++  ${frame_weights:+ "--frame-weights=$frame_weights"} \
++  ${utt_weights:+ "--utt-weights=$utt_weights"} \
++  "$feats_cv" "$labels_cv" $mlp_best \
++  2>> $log
++
++loss=$(cat $dir/log/iter00.initial.log | grep "AvgLoss:" | tail -n 1 | awk '{ print $4; }')
++loss_type=$(cat $dir/log/iter00.initial.log | grep "AvgLoss:" | tail -n 1 | awk '{ print $5; }')
++echo "CROSSVAL PRERUN AVG.LOSS $(printf "%.4f" $loss) $loss_type"
++
++# resume lr-halving,
++halving=0
++[ -e $dir/.halving ] && halving=$(cat $dir/.halving)
++
++# training,
++for iter in $(seq -w $max_iters); do
++  echo -n "ITERATION $iter: "
++
++  # shuffle train.scp
++  cat $dir/train.scp | utils/shuffle_list.pl --srand ${seed:-${randseed}} > $dir/train.scp.iter$iter
++  rm $dir/train.scp
++  mv $dir/train.scp.iter$iter $dir/train.scp
++
++  mlp_next=$dir/nnet/${mlp_base}_iter${iter}
++
++  # skip iteration (epoch) if already done,
++  [ -e $dir/.done_iter$iter ] && echo -n "skipping... " && ls $mlp_next* && continue
++
++  # set dropout-rate from the schedule,
++  if [ -n ${dropout_array[$((${iter#0}-1))]-''} ]; then
++    dropout_rate=${dropout_array[$((${iter#0}-1))]}
++    nnet-copy --dropout-rate=$dropout_rate $mlp_best ${mlp_best}.dropout_rate${dropout_rate}
++    mlp_best=${mlp_best}.dropout_rate${dropout_rate}
++  fi
++
++  # select the split,
++  feats_tr_portion="$feats_tr" # no split?
++  if [ -n "$split_feats" ]; then
++    portion=$((1 + iter % split_feats))
++    feats_tr_portion="${feats_tr/train.scp/train.${portion}.scp}"
++  fi
++
++  # training,
++  log=$dir/log/iter${iter}.tr.log; hostname>$log
++  $train_tool --cross-validate=false --randomize=true --verbose=$verbose $train_tool_opts \
++    --learn-rate=$learn_rate --momentum=$momentum \
++    --l1-penalty=$l1_penalty --l2-penalty=$l2_penalty \
++    ${feature_transform:+ --feature-transform=$feature_transform} \
++    ${frame_weights:+ "--frame-weights=$frame_weights"} \
++    ${utt_weights:+ "--utt-weights=$utt_weights"} \
++    "$feats_tr_portion" "$labels_tr" $mlp_best $mlp_next \
++    2>> $log || exit 1;
++
++  tr_loss=$(cat $dir/log/iter${iter}.tr.log | grep "AvgLoss:" | tail -n 1 | awk '{ print $4; }')
++  echo -n "TRAIN AVG.LOSS $(printf "%.4f" $tr_loss), (lrate$(printf "%.6g" $learn_rate)), "
++
++  # cross-validation,
++  log=$dir/log/iter${iter}.cv.log; hostname>$log
++  $train_tool --cross-validate=true --randomize=false --verbose=$verbose $train_tool_opts \
++    ${feature_transform:+ --feature-transform=$feature_transform} \
++    ${frame_weights:+ "--frame-weights=$frame_weights"} \
++    ${utt_weights:+ "--utt-weights=$utt_weights"} \
++    "$feats_cv" "$labels_cv" $mlp_next \
++    2>>$log || exit 1;
++
++  loss_new=$(cat $dir/log/iter${iter}.cv.log | grep "AvgLoss:" | tail -n 1 | awk '{ print $4; }')
++  echo -n "CROSSVAL AVG.LOSS $(printf "%.4f" $loss_new), "
++
++  # accept or reject?
++  loss_prev=$loss
++  if [ 1 == $(awk "BEGIN{print($loss_new < $loss ? 1:0);}") -o $iter -le $keep_lr_iters -o $iter -le $min_iters ]; then
++    # accepting: the loss was better, or we had fixed learn-rate, or we had fixed epoch-number,
++    loss=$loss_new
++    mlp_best=$dir/nnet/${mlp_base}_iter${iter}_learnrate${learn_rate}_tr$(printf "%.4f" $tr_loss)_cv$(printf "%.4f" $loss_new)
++    [ $iter -le $min_iters ] && mlp_best=${mlp_best}_min-iters-$min_iters
++    [ $iter -le $keep_lr_iters ] && mlp_best=${mlp_best}_keep-lr-iters-$keep_lr_iters
++    mv $mlp_next $mlp_best
++    echo "nnet accepted ($(basename $mlp_best))"
++    echo $mlp_best > $dir/.mlp_best
++  else
++    # rejecting,
++    mlp_reject=$dir/nnet/${mlp_base}_iter${iter}_learnrate${learn_rate}_tr$(printf "%.4f" $tr_loss)_cv$(printf "%.4f" $loss_new)_rejected
++    mv $mlp_next $mlp_reject
++    echo "nnet rejected ($(basename $mlp_reject))"
++  fi
++
++  # create .done file, the iteration (epoch) is completed,
++  touch $dir/.done_iter$iter
++
++  # continue with original learn-rate,
++  [ $iter -le $keep_lr_iters ] && continue
++
++  # no learn-rate halving yet, if keep_lr_iters set accordingly
++  if [ $iter -ge $start_half_lr ];then
++     halving=1
++     echo $halving >$dir/.halving
++  fi
++
++  # stopping criterion,
++  rel_impr=$(awk "BEGIN{print(($loss_prev-$loss)/$loss_prev);}")
++  if [ 1 == $halving -a 1 == $(awk "BEGIN{print($rel_impr < $end_halving_impr ? 1:0);}") ]; then
++    if [ $iter -le $min_iters ]; then
++      echo we were supposed to finish, but we continue as min_iters : $min_iters
++      continue
++    fi
++    echo finished, too small rel. improvement $rel_impr
++    break
++  fi
++
++  # start learning-rate fade-out when improvement is low,
++  if [ 1 == $(awk "BEGIN{print($rel_impr < $start_halving_impr ? 1:0);}") ]; then
++    halving=1
++    echo $halving >$dir/.halving
++  fi
++
++  # reduce the learning-rate,
++  if [ 1 == $halving ]; then
++    learn_rate=$(awk "BEGIN{print($learn_rate*$halving_factor)}")
++    echo $learn_rate >$dir/.learn_rate
++  fi
++done
++
++# select the best network,
++if [ $mlp_best != $mlp_init ]; then
++  mlp_final=${mlp_best}_final_
++  ( cd $dir/nnet; ln -s $(basename $mlp_best) $(basename $mlp_final); )
++  ( cd $dir; ln -s nnet/$(basename $mlp_final) final.nnet; )
++  echo "$0: Succeeded training the Neural Network : '$dir/final.nnet'"
++else
++  echo "$0: Error training neural network..."
++  exit 1
++fi
++
 diff --git a/src/cudamatrix/cu-kernels-ansi.h b/src/cudamatrix/cu-kernels-ansi.h
 index 6b99a77..61c3d5f 100644
 --- a/src/cudamatrix/cu-kernels-ansi.h
@@ -2685,6 +3531,497 @@ index 0000000..f723a41
 +} // namespace kaldi
 +
 +#endif
+diff --git a/src/nnetbin/Makefile b/src/nnetbin/Makefile
+index 49a174e..b8b0482 100644
+--- a/src/nnetbin/Makefile
++++ b/src/nnetbin/Makefile
+@@ -15,7 +15,8 @@ BINFILES = nnet-train-frmshuff \
+         nnet-forward nnet-copy nnet-info nnet-concat \
+         transf-to-nnet cmvn-to-nnet nnet-initialize \
+ 	feat-to-post paste-post train-transitions \
+-	cuda-gpu-available nnet-set-learnrate
++	cuda-gpu-available nnet-set-learnrate \
++	nnet-train-fsmn-streams
+ 
+ OBJFILES =
+ 
+diff --git a/src/nnetbin/nnet-forward.cc b/src/nnetbin/nnet-forward.cc
+index 062bca7..bd3be36 100644
+--- a/src/nnetbin/nnet-forward.cc
++++ b/src/nnetbin/nnet-forward.cc
+@@ -141,6 +141,12 @@ int main(int argc, char *argv[]) {
+       // push it to gpu,
+       feats = mat;
+ 
++      ///only for nnet with fsmn component
++      Vector<BaseFloat> flags;
++      flags.Resize(feats_transf.NumRows(), kSetZero);
++      flags.Set(1.0);
++      nnet.SetFlags(flags);
++
+       // fwd-pass, feature transform,
+       nnet_transf.Feedforward(feats, &feats_transf);
+       if (!KALDI_ISFINITE(feats_transf.Sum())) {  // check there's no nan/inf,
+diff --git a/src/nnetbin/nnet-train-fsmn-streams.cc b/src/nnetbin/nnet-train-fsmn-streams.cc
+new file mode 100644
+index 0000000..f57fbf5
+--- /dev/null
++++ b/src/nnetbin/nnet-train-fsmn-streams.cc
+@@ -0,0 +1,420 @@
++// nnetbin/nnet-train-fsmn-streams.cc
++// Copyright 2018 Alibaba Inc. (Author: ShiLiang Zhang)
++
++// See ../../COPYING for clarification regarding multiple authors
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//  http://www.apache.org/licenses/LICENSE-2.0
++//
++// THIS CODE IS PROVIDED *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
++// KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
++// WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
++// MERCHANTABLITY OR NON-INFRINGEMENT.
++// See the Apache 2 License for the specific language governing permissions and
++// limitations under the License.
++
++#include "nnet/nnet-trnopts.h"
++#include "nnet/nnet-nnet.h"
++#include "nnet/nnet-loss.h"
++#include "nnet/nnet-randomizer.h"
++#include "base/kaldi-common.h"
++#include "util/common-utils.h"
++#include "base/timer.h"
++#include "cudamatrix/cu-device.h"
++
++int main(int argc, char *argv[]) {
++  using namespace kaldi;
++  using namespace kaldi::nnet1;
++  typedef kaldi::int32 int32;
++
++  try {
++    const char *usage =
++      "Perform one iteration (epoch) of Neural Network training with\n"
++      "mini-batch Stochastic Gradient Descent. The training targets\n"
++      "are usually pdf-posteriors, prepared by ali-to-post.\n"
++      "Usage:  nnet-train-fsmn-streams [options] <feature-rspecifier> <targets-rspecifier> <model-in> [<model-out>]\n"
++      "e.g.: nnet-train-fsmn-streams scp:feats.scp ark:posterior.ark nnet.init nnet.iter1\n";
++
++    ParseOptions po(usage);
++
++    NnetTrainOptions trn_opts;
++    trn_opts.Register(&po);
++    NnetDataRandomizerOptions rnd_opts;
++    rnd_opts.Register(&po);
++    LossOptions loss_opts;
++    loss_opts.Register(&po);
++
++    bool binary = true;
++    po.Register("binary", &binary, "Write output in binary mode");
++
++    bool crossvalidate = false;
++    po.Register("cross-validate", &crossvalidate,
++        "Perform cross-validation (don't back-propagate)");
++
++    bool randomize = true;
++    po.Register("randomize", &randomize,
++        "Perform the frame-level shuffling within the Cache::");
++
++    std::string feature_transform;
++    po.Register("feature-transform", &feature_transform,
++        "Feature transform in Nnet format");
++
++    std::string objective_function = "xent";
++    po.Register("objective-function", &objective_function,
++        "Objective function : xent|mse|multitask");
++
++    int32 max_frames = 360000;
++    po.Register("max-frames", &max_frames,
++        "Maximum number of frames an utterance can have (skipped if longer)");
++
++    int32 length_tolerance = 5;
++    po.Register("length-tolerance", &length_tolerance,
++        "Allowed length mismatch of features/targets/weights "
++        "(in frames, we truncate to the shortest)");
++
++    std::string frame_weights;
++    po.Register("frame-weights", &frame_weights,
++        "Per-frame weights, used to re-scale gradients.");
++
++    std::string utt_weights;
++    po.Register("utt-weights", &utt_weights,
++        "Per-utterance weights, used to re-scale frame-weights.");
++
++    std::string use_gpu="yes";
++    po.Register("use-gpu", &use_gpu,
++        "yes|no|optional, only has effect if compiled with CUDA");
++
++    po.Read(argc, argv);
++
++    if (po.NumArgs() != 3 + (crossvalidate ? 0 : 1)) {
++      po.PrintUsage();
++      exit(1);
++    }
++
++    std::string feature_rspecifier = po.GetArg(1),
++      targets_rspecifier = po.GetArg(2),
++      model_filename = po.GetArg(3);
++
++    std::string target_model_filename;
++    if (!crossvalidate) {
++      target_model_filename = po.GetArg(4);
++    }
++
++    using namespace kaldi;
++    using namespace kaldi::nnet1;
++    typedef kaldi::int32 int32;
++
++#if HAVE_CUDA == 1
++    CuDevice::Instantiate().SelectGpuId(use_gpu);
++#endif
++
++    Nnet nnet_transf;
++    if (feature_transform != "") {
++      nnet_transf.Read(feature_transform);
++    }
++
++    Nnet nnet;
++    nnet.Read(model_filename);
++    nnet.SetTrainOptions(trn_opts);
++
++    if (crossvalidate) {
++      nnet_transf.SetDropoutRate(0.0);
++      nnet.SetDropoutRate(0.0);
++    }
++
++    kaldi::int64 total_frames = 0;
++
++    SequentialBaseFloatMatrixReader feature_reader(feature_rspecifier);
++    RandomAccessPosteriorReader targets_reader(targets_rspecifier);
++    RandomAccessBaseFloatVectorReader weights_reader;
++    if (frame_weights != "") {
++      weights_reader.Open(frame_weights);
++    }
++    RandomAccessBaseFloatReader utt_weights_reader;
++    if (utt_weights != "") {
++      utt_weights_reader.Open(utt_weights);
++    }
++
++    RandomizerMask randomizer_mask(rnd_opts);
++    MatrixRandomizer feature_randomizer(rnd_opts);
++    PosteriorRandomizer targets_randomizer(rnd_opts);
++    VectorRandomizer weights_randomizer(rnd_opts);
++    VectorRandomizer flags_randomizer(rnd_opts);
++
++    Xent xent(loss_opts);
++    Mse mse(loss_opts);
++
++    MultiTaskLoss multitask(loss_opts);
++    if (0 == objective_function.compare(0, 9, "multitask")) {
++      // objective_function contains something like :
++      // 'multitask,xent,2456,1.0,mse,440,0.001'
++      //
++      // the meaning is following:
++      // 'multitask,<type1>,<dim1>,<weight1>,...,<typeN>,<dimN>,<weightN>'
++      multitask.InitFromString(objective_function);
++    }
++
++    CuMatrix<BaseFloat> feats_transf, nnet_out, obj_diff;
++
++    Timer time;
++    KALDI_LOG << (crossvalidate ? "CROSS-VALIDATION" : "TRAINING")
++              << " STARTED";
++
++    int32 num_done = 0,
++          num_no_tgt_mat = 0,
++          num_other_error = 0;
++
++    // main loop,
++    while (!feature_reader.Done()) {
++#if HAVE_CUDA == 1
++      // check that GPU computes accurately,
++      CuDevice::Instantiate().CheckGpuHealth();
++#endif
++      // fill the randomizer,
++      for ( ; !feature_reader.Done(); feature_reader.Next()) {
++        if (feature_randomizer.IsFull()) {
++          // break the loop without calling Next(),
++          // we keep the 'utt' for next round,
++          break;
++        }
++        std::string utt = feature_reader.Key();
++        KALDI_VLOG(3) << "Reading " << utt;
++        // check that we have targets,
++        if (!targets_reader.HasKey(utt)) {
++          KALDI_WARN << utt << ", missing targets";
++          num_no_tgt_mat++;
++          continue;
++        }
++        // check we have per-frame weights,
++        if (frame_weights != "" && !weights_reader.HasKey(utt)) {
++          KALDI_WARN << utt << ", missing per-frame weights";
++          num_other_error++;
++          continue;
++        }
++        // check we have per-utterance weights,
++        if (utt_weights != "" && !utt_weights_reader.HasKey(utt)) {
++          KALDI_WARN << utt << ", missing per-utterance weight";
++          num_other_error++;
++          continue;
++        }
++        // get feature / target pair,
++        Matrix<BaseFloat> mat = feature_reader.Value();
++        Posterior targets = targets_reader.Value(utt);
++        // get per-frame weights,
++        Vector<BaseFloat> weights;
++        if (frame_weights != "") {
++          weights = weights_reader.Value(utt);
++        } else {  // all per-frame weights are 1.0,
++          weights.Resize(mat.NumRows());
++          weights.Set(1.0);
++        }
++        // multiply with per-utterance weight,
++        if (utt_weights != "") {
++          BaseFloat w = utt_weights_reader.Value(utt);
++          KALDI_ASSERT(w >= 0.0);
++          if (w == 0.0) continue;  // remove sentence from training,
++          weights.Scale(w);
++        }
++
++        // skip too long utterances (or we run out of memory),
++        if (mat.NumRows() > max_frames) {
++          KALDI_WARN << "Utterance too long, skipping! " << utt
++            << " (length " << mat.NumRows() << ", max_frames "
++            << max_frames << ")";
++          num_other_error++;
++          continue;
++        }
++
++        // correct small length mismatch or drop sentence,
++        {
++          // add lengths to vector,
++          std::vector<int32> length;
++          length.push_back(mat.NumRows());
++          length.push_back(targets.size());
++          length.push_back(weights.Dim());
++          // find min, max,
++          int32 min = *std::min_element(length.begin(), length.end());
++          int32 max = *std::max_element(length.begin(), length.end());
++          // fix or drop ?
++          if (max - min < length_tolerance) {
++            // we truncate to shortest,
++            if (mat.NumRows() != min) mat.Resize(min, mat.NumCols(), kCopyData);
++            if (targets.size() != min) targets.resize(min);
++            if (weights.Dim() != min) weights.Resize(min, kCopyData);
++          } else {
++            KALDI_WARN << "Length mismatch! Targets " << targets.size()
++                       << ", features " << mat.NumRows() << ", " << utt;
++            num_other_error++;
++            continue;
++          }
++        }
++        // apply feature transform (if empty, input is copied),
++        nnet_transf.Feedforward(CuMatrix<BaseFloat>(mat), &feats_transf);
++
++        // remove frames with '0' weight from training,
++        {
++          // are there any frames to be removed? (frames with zero weight),
++          BaseFloat weight_min = weights.Min();
++          KALDI_ASSERT(weight_min >= 0.0);
++          if (weight_min == 0.0) {
++            // create vector with frame-indices to keep,
++            std::vector<MatrixIndexT> keep_frames;
++            for (int32 i = 0; i < weights.Dim(); i++) {
++              if (weights(i) > 0.0) {
++                keep_frames.push_back(i);
++              }
++            }
++
++            // when all frames are removed, we skip the sentence,
++            if (keep_frames.size() == 0) continue;
++
++            // filter feature-frames,
++            CuMatrix<BaseFloat> tmp_feats(keep_frames.size(), feats_transf.NumCols());
++            tmp_feats.CopyRows(feats_transf, CuArray<MatrixIndexT>(keep_frames));
++            tmp_feats.Swap(&feats_transf);
++
++            // filter targets,
++            Posterior tmp_targets;
++            for (int32 i = 0; i < keep_frames.size(); i++) {
++              tmp_targets.push_back(targets[keep_frames[i]]);
++            }
++            tmp_targets.swap(targets);
++
++            // filter weights,
++            Vector<BaseFloat> tmp_weights(keep_frames.size());
++            for (int32 i = 0; i < keep_frames.size(); i++) {
++              tmp_weights(i) = weights(keep_frames[i]);
++            }
++            tmp_weights.Swap(&weights);
++          }
++        }
++
++        // pass data to randomizers,
++        KALDI_ASSERT(feats_transf.NumRows() == targets.size());
++        feature_randomizer.AddData(feats_transf);
++        targets_randomizer.AddData(targets);
++        weights_randomizer.AddData(weights);
++        Vector<BaseFloat> tmp_flags;
++        tmp_flags.Resize(feats_transf.NumRows(), kSetZero);
++	tmp_flags.Set(BaseFloat(num_done));
++	flags_randomizer.AddData(tmp_flags);
++        num_done++;
++
++        // report the speed,
++        if (num_done % 5000 == 0) {
++          double time_now = time.Elapsed();
++          KALDI_VLOG(1) << "After " << num_done << " utterances: "
++            << "time elapsed = " << time_now / 60 << " min; "
++            << "processed " << total_frames / time_now << " frames per sec.";
++        }
++      }
++
++      // train with data from randomizers (using mini-batches),
++      for ( ; !feature_randomizer.Done(); feature_randomizer.Next(),
++                                          targets_randomizer.Next(),
++                                          weights_randomizer.Next(),
++					  flags_randomizer.Next()) {
++        // get block of feature/target pairs,
++        const CuMatrixBase<BaseFloat>& nnet_in = feature_randomizer.Value();
++        const Posterior& nnet_tgt = targets_randomizer.Value();
++        const Vector<BaseFloat>& frm_weights = weights_randomizer.Value();
++	const Vector<BaseFloat>& flags = flags_randomizer.Value();
++	nnet.SetFlags(flags);
++
++        // forward pass,
++        nnet.Propagate(nnet_in, &nnet_out);
++
++        // evaluate objective function we've chosen,
++        if (objective_function == "xent") {
++          // gradients re-scaled by weights in Eval,
++          xent.Eval(frm_weights, nnet_out, nnet_tgt, &obj_diff);
++        } else if (objective_function == "mse") {
++          // gradients re-scaled by weights in Eval,
++          mse.Eval(frm_weights, nnet_out, nnet_tgt, &obj_diff);
++        } else if (0 == objective_function.compare(0, 9, "multitask")) {
++          // gradients re-scaled by weights in Eval,
++          multitask.Eval(frm_weights, nnet_out, nnet_tgt, &obj_diff);
++        } else {
++          KALDI_ERR << "Unknown objective function code : " << objective_function;
++        }
++
++        if (!crossvalidate) {
++          // back-propagate, and do the update,
++          nnet.Backpropagate(obj_diff, NULL);
++        }
++
++        // 1st mini-batch : show what happens in network,
++        if (total_frames == 0) {
++          KALDI_VLOG(1) << "### After " << total_frames << " frames,";
++          KALDI_VLOG(1) << nnet.InfoPropagate();
++          if (!crossvalidate) {
++            KALDI_VLOG(1) << nnet.InfoBackPropagate();
++            KALDI_VLOG(1) << nnet.InfoGradient();
++          }
++        }
++
++        // VERBOSE LOG
++        // monitor the NN training (--verbose=2),
++        if (GetVerboseLevel() >= 2) {
++          static int32 counter = 0;
++          counter += nnet_in.NumRows();
++          // print every 25k frames,
++          if (counter >= 25000) {
++            KALDI_VLOG(2) << "### After " << total_frames << " frames,";
++            KALDI_VLOG(2) << nnet.InfoPropagate();
++            if (!crossvalidate) {
++              KALDI_VLOG(2) << nnet.InfoBackPropagate();
++              KALDI_VLOG(2) << nnet.InfoGradient();
++            }
++            counter = 0;
++          }
++        }
++
++        total_frames += nnet_in.NumRows();
++      }
++    }  // main loop,
++
++    // after last mini-batch : show what happens in network,
++    KALDI_VLOG(1) << "### After " << total_frames << " frames,";
++    KALDI_VLOG(1) << nnet.InfoPropagate();
++    if (!crossvalidate) {
++      KALDI_VLOG(1) << nnet.InfoBackPropagate();
++      KALDI_VLOG(1) << nnet.InfoGradient();
++    }
++
++    if (!crossvalidate) {
++      nnet.Write(target_model_filename, binary);
++    }
++
++    KALDI_LOG << "Done " << num_done << " files, "
++      << num_no_tgt_mat << " with no tgt_mats, "
++      << num_other_error << " with other errors. "
++      << "[" << (crossvalidate ? "CROSS-VALIDATION" : "TRAINING")
++      << ", " << (randomize ? "RANDOMIZED" : "NOT-RANDOMIZED")
++      << ", " << time.Elapsed() / 60 << " min, processing "
++      << total_frames / time.Elapsed() << " frames per sec.]";
++
++    if (objective_function == "xent") {
++      KALDI_LOG << xent.ReportPerClass();
++      KALDI_LOG << xent.Report();
++    } else if (objective_function == "mse") {
++      KALDI_LOG << mse.Report();
++    } else if (0 == objective_function.compare(0, 9, "multitask")) {
++      KALDI_LOG << multitask.Report();
++    } else {
++      KALDI_ERR << "Unknown objective function code : " << objective_function;
++    }
++
++#if HAVE_CUDA == 1
++    CuDevice::Instantiate().PrintProfile();
++#endif
++
++    return 0;
++  } catch(const std::exception &e) {
++    std::cerr << e.what();
++    return -1;
++  }
++}
+diff --git a/src/nnetbin/nnet-train-mmi-sequential.cc b/src/nnetbin/nnet-train-mmi-sequential.cc
+index 2554d64..c9ebf7a 100644
+--- a/src/nnetbin/nnet-train-mmi-sequential.cc
++++ b/src/nnetbin/nnet-train-mmi-sequential.cc
+@@ -291,6 +291,12 @@ int main(int argc, char *argv[]) {
+       // 3) get the pre-softmax outputs from NN,
+       // apply transform,
+       nnet_transf.Feedforward(CuMatrix<BaseFloat>(mat), &feats_transf);
++
++      // set sent flag for fsmn component
++      Vector<BaseFloat> flags;
++      flags.Resize(num_frames, kSetZero);
++      nnet.SetFlags(flags);
++
+       // propagate through the nnet (we know it's w/o softmax),
+       nnet.Propagate(feats_transf, &nnet_out);
+       // subtract the log_prior,
+diff --git a/src/nnetbin/nnet-train-mpe-sequential.cc b/src/nnetbin/nnet-train-mpe-sequential.cc
+index 2ba1452..1d8cef2 100644
+--- a/src/nnetbin/nnet-train-mpe-sequential.cc
++++ b/src/nnetbin/nnet-train-mpe-sequential.cc
+@@ -294,6 +294,12 @@ int main(int argc, char *argv[]) {
+       // 3) get the pre-softmax outputs from NN,
+       // apply transform,
+       nnet_transf.Feedforward(CuMatrix<BaseFloat>(mat), &feats_transf);
++
++      // set sent flag for fsmn component
++      Vector<BaseFloat> flags;
++      flags.Resize(num_frames, kSetZero);
++      nnet.SetFlags(flags);
++
+       // propagate through the nnet (we know it's w/o softmax),
+       nnet.Propagate(feats_transf, &nnet_out);
+       // subtract the log_prior,
 -- 
 1.8.3.1
 

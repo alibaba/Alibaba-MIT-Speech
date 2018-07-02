@@ -1,5 +1,4 @@
 # Alibaba-MIT-Speech
-
 This is a PATCH file with the DFSMN related codes and example scripts for LibriSpeech task.  
 
 # Apply Patch
@@ -7,6 +6,7 @@ This is a PATCH file with the DFSMN related codes and example scripts for LibriS
 The patch is built based on [the Kaldi speech recognition toolkit](https://github.com/kaldi-asr/kaldi) with commit "04b1f7d6658bc035df93d53cb424edc127fab819". 
 
 You can apply this patch to your own kaldi branch by using the following commands:
+(*Instead of applying the PATCH file, one can also directly clone the project at "https://github.com/tramphero/kaldi"*)
 
 ##Take a look at what changes are in the patch
 
@@ -46,4 +46,6 @@ The DFSMN_S is a small DFSMN with six DFSMN-components while DFSMN_L is a large 
 
 For the 960-hours-setting, it takes about 2-3 days to train DFSMN_S only using one M40 GPU. 
 
-And the detailed experimental results are listed in the RESULTS file. 
+And the detailed experimental results are listed in the RESULTS file.
+
+
